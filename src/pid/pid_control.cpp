@@ -15,7 +15,8 @@ int BalancePD::compute(float angle, float gyro)
 
 // Velocity PI 
 VelocityPI::VelocityPI(float kp, float ki, float integral_limit)
-    : kp_(kp), ki_(ki), integral_limit_(integral_limit)
+    : kp_(kp), ki_(ki), integral_limit_(integral_limit),
+      encoder_bias_(0.0f), encoder_integral_(0.0f)
 {
 }
 
@@ -37,4 +38,19 @@ int VelocityPI::compute(int encoder_left, int encoder_right, float move_x)
     }
 
     return -encoder_bias_ * kp_ / 100.0f - encoder_integral_ * ki_ / 100.0f;
+}
+
+void VelocityPI::reset()
+{
+    encoder_integral_ = 0.0f;
+}
+
+TurnPD::TurnPD(float kp, float kd)
+    : kp_(kp), kd_(kd)
+{
+}
+
+int TurnPD::compute(float gyro_z, float move_z)
+{
+    return 0 * kp_ / 100.0f + gyro_z * kd_ / 100.0f + move_z;
 }
