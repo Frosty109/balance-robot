@@ -7,7 +7,7 @@ extern "C" {
     #include "stm32f10x_rcc.h"
 }
 
-// PWN Register shortcuts 
+// PWM Register shortcuts 
 static inline void motor_set_pwm(uint16_t l_a, uint16_t l_b, uint16_t r_a, uint16_t r_b)
 {
     TIM8->CCR1 = l_a;
@@ -111,5 +111,5 @@ int Motor::deadzone(int value)
 
 int Motor::abs(int value)
 {
-    return value < 0 ? -value : value
+    return value < 0 ? -value : value;
 }
