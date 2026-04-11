@@ -94,3 +94,22 @@ bool Motor::isFaulted(float angle, float battery, bool stop_flag)
     }
     return false;
 }
+
+int Motor::clamp(int value, int max, int min)
+{
+    if(value > max) return max;
+    if(value < min) return min;
+    return value;
+}
+
+int Motor::deadzone(int value)
+{
+    if(value > 0) return value + DEADZONE;
+    if(value < 0) return value - DEADZONE;
+    return 0;
+}
+
+int Motor::abs(int value)
+{
+    return value < 0 ? -value : value
+}
