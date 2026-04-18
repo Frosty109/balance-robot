@@ -50,3 +50,10 @@ void Encoder::init()
     TIM_Cmd(tim_, ENABLE);
 
 }
+
+int Encoder::read() 
+{
+    int count { static_cast<short>(tim_->CNT)};
+    tim_->CNT = 0;
+    return count;
+}
