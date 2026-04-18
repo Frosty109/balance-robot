@@ -51,9 +51,27 @@ void Encoder::init()
 
 }
 
-int Encoder::read() 
+int Encoder::read()
 {
-    int count { static_cast<short>(tim_->CNT)};
+    int count { static_cast<short>(tim_->CNT) };
     tim_->CNT = 0;
     return count;
+}
+
+extern "C" {
+    void TIM3_IRQHandler(void)
+    {
+        if(TIM3->SR & 0x0001)
+        {
+        }
+        TIM3->SR &= ~(1 << 0);
+    }
+
+    void TIM4_IRQHandler(void)
+    {
+        if(TIM4->SR & 0x0001)
+        {
+        }
+        TIM4->SR &= ~(1 << 0);
+    }
 }
