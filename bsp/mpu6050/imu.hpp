@@ -25,6 +25,7 @@ private:
     static constexpr int        DEFAULT_MPU_HZ {200};
     static constexpr uint8_t    DEV_ADDR {0x68};
     static constexpr uint8_t    WHO_AM_I_REG {0x75};
+    static constexpr uint8_t    WHO_AM_I_VAL {0x68};
 
     static const signed char GYRO_ORIENTATION[9];
     
