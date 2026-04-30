@@ -64,3 +64,4 @@ uint16_t Battery::getAverage(uint8_t ch, uint8_t times)
     }
     return (times == 4) ? total >> 2 : total / times;
 }
+
