@@ -15,6 +15,8 @@ public:
     short getGyroX() const;
     short getGyroZ() const;
 
+    float getAccelZ() const;
+
 private:
     float pitch_, roll_, yaw_;
     float q0_, q1_, q2_, q3_;
