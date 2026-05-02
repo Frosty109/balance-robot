@@ -14,3 +14,4 @@ void Stm32MotorHal::setMotorPWM(int pwm_left, int pwm_right)
 {
     motor_.setPWM(pwm_left, pwm_right);
 }
+
