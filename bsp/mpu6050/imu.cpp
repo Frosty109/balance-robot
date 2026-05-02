@@ -73,6 +73,8 @@ float Imu::getYaw()   const { return yaw_;   }
 short Imu::getGyroX() const { return gyro_[0]; }
 short Imu::getGyroZ() const { return gyro_[2]; }
 
+float Imu::getAccelZ() const { return accel_[2]; }
+
 unsigned short Imu::inv_row_2_scale(const signed char* row)
 {
     if      (row[0] > 0) return 0;
