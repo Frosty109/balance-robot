@@ -1,0 +1,6 @@
+services:
+  build:
+    build: .
+    volumes: 
+      - .:/app
+    command: bash -c "cmake -B build && cmake --build build"
