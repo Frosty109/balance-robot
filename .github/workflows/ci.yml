@@ -1,0 +1,12 @@
+name: CI
+
+on: [push]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -B build
+      - run: cmake --build build
+      - run: cd build && ctest --output-on-failure 
