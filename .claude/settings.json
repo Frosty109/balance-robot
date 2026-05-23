@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -c \"import json,sys,subprocess; d=json.load(sys.stdin); f=d.get('tool_input',{}).get('file_path',''); epub=f[:-3]+'.epub'; subprocess.run(['pandoc',f,'-o',epub]) if f.endswith('.md') and any(f.startswith(p) for p in ('Learning-Journal/','session-notes/','issues/')) else None\" 2>/dev/null || true",
+            "statusMessage": "Converting to epub..."
+          }
+        ]
+      }
+    ]
+  }
+}

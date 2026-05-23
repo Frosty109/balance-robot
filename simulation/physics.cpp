@@ -21,9 +21,9 @@ void Physics::update(float dt)
     pitch_rate_ += pitch_accel * dt;
     pitch_      += pitch_rate_ * dt;
 
-    velocity_       = force * dt;
-    position_left_  += velocity_ * ENCODER_SCALE;
-    position_right_ += velocity_ * ENCODER_SCALE;
+    velocity_       += force * dt;
+    position_left_  += velocity_ * ENCODER_SCALE * dt;
+    position_right_ += velocity_ * ENCODER_SCALE * dt;
 }
 
 float Physics::getPitch()           const { return pitch_; }
