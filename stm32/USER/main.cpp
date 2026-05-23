@@ -34,7 +34,9 @@ int main()
     usart.init(115200);
 
     Stm32SensorHal sensor_hal(enc_left, enc_right, battery);
-    Stm32MotorHal  motor_hal(2880, 0);
+    constexpr uint16_t PWM_ARR = 2880;  // 72MHz / 2880 = 25kHz, above audible range
+    constexpr uint16_t PWM_PSC = 0;
+    Stm32MotorHal  motor_hal(PWM_ARR, PWM_PSC);
 
     sensor_hal.init();
     motor_hal.init();
