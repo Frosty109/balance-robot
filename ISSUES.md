@@ -7,25 +7,25 @@ Date noted: 2026-05-07.
 
 ## Bugs
 
-- [ ] **Physics integration is wrong** — `simulation/physics.cpp:24-26`
+- [x] **Physics integration is wrong** — `simulation/physics.cpp:24-26`
   - `velocity_ = force * dt` overwrites velocity each tick instead of integrating
     it (`velocity_ += accel * dt`).
   - `position_left_ += velocity_ * ENCODER_SCALE` is missing `* dt`.
   - Effect: the sim isn't physically meaningful, so PID gains tuned in sim
     won't transfer cleanly to the real robot.
 
-- [ ] **Build is broken** — `CMakeLists.txt:27-28`
+- [x] **Build is broken** — `CMakeLists.txt:27-28`
   - `balance_tests` target lists `tests/test_velocity_pi.cpp` and
     `tests/test_turn_pd.cpp`, but only `test_balance_pd.cpp` exists.
   - Either write the two missing test files or remove them from the target.
 
-- [ ] **Stray file at project root** — `imu.cpp`
+- [x] **Stray file at project root** — `imu.cpp`
   - 1-line orphan. The real implementation is `bsp/mpu6050/imu.cpp`.
   - Delete.
 
 ## Smaller cleanups
 
-- [ ] **Implicit narrowing in `BalancePD::compute`** — `src/pid/pid_control.cpp:13`
+- [x] **Implicit narrowing in `BalancePD::compute`** — `src/pid/pid_control.cpp:13`
   - Returns `int` from a float expression with no explicit cast.
   - Add `static_cast<int>(...)` so intent is visible and `-Wconversion` stays
     quiet if enabled.
@@ -35,7 +35,7 @@ Date noted: 2026-05-07.
   - Fine for live plotting, painful for batch PID tuning. Consider a
     `--realtime` flag (default off).
 
-- [ ] **Magic numbers in STM32 main** — `stm32/USER/main.cpp:37`
+- [x] **Magic numbers in STM32 main** — `stm32/USER/main.cpp:37`
   - `Stm32MotorHal motor_hal(2880, 0)` — name these (PWM period / prescaler)
     so the call site explains itself.
 
