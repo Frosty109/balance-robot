@@ -27,8 +27,11 @@ Objects/
 
 # Local only
 PLAN.md
+CLAUDE.md
 Learning-Journal/
 session-notes/
+claude-config/
+issues/
 
 # Misc
 *.DS_Store
