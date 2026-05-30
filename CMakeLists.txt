@@ -25,10 +25,13 @@ FetchContent_MakeAvailable(googletest)
 
 add_executable(balance_tests
     src/pid/pid_control.cpp
+    src/app/app_control.cpp
     tests/test_balance_pd.cpp
     tests/test_velocity_pi.cpp
     tests/test_turn_pd.cpp
+    tests/test_app_control.cpp
 )
+
 target_link_libraries(balance_tests PRIVATE GTest::gtest_main)
 target_include_directories(balance_tests PRIVATE .)
 
