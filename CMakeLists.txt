@@ -14,6 +14,8 @@ add_executable (sim
 )
 target_include_directories(sim PRIVATE .)
 
+enable_testing()
+
 include(FetchContent)
 FetchContent_Declare(
     googletest
@@ -31,4 +33,4 @@ target_link_libraries(balance_tests PRIVATE GTest::gtest_main)
 target_include_directories(balance_tests PRIVATE .)
 
 include(GoogleTest)
-gtest_discover_tests(balance_tests)
+gtest_discover_tests(balance_tests DISCOVERY_MODE PRE_TEST)
