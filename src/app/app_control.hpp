@@ -10,7 +10,7 @@ public:
     AppControl(ISensorHal& sensor, IMotorHal& motor, BalancePD balance,
                 VelocityPI velocity, TurnPD turn);
 
-    void update();
+    void update(float move_x = 0.0f, float move_z = 0.0f);
     void reset();
 
 private:
