@@ -29,9 +29,12 @@ Objects/
 PLAN.md
 CLAUDE.md
 Learning-Journal/
-session-notes/
+sessions/
+learning/
+plans/
 claude-config/
 issues/
+Yahboom-Self-Balancing-Car/
 
 # Misc
 *.DS_Store
