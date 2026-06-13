@@ -4,6 +4,13 @@ project(balance_car_cpp CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Cross (firmware) build: configure ONLY the STM32 target, skip sim/tests/gtest.
+if(CMAKE_CROSSCOMPILING)
+    enable_language(C ASM)
+    add_subdirectory(stm32)
+    return()
+endif()
+
 add_executable (sim
     src/pid/pid_control.cpp
     src/app/app_control.cpp
