@@ -71,6 +71,21 @@ extern "C" int fputc(int ch, FILE* f)
     return ch;
 }
 
+// newlib (GCC) calls _write for all stdout; Keil calls fputc above
+// __GNUC__ too, exclude explicitly, GCC-only path.
+#if defined(__GNUC__) && !defined(__ARMCC_VERSION)
+extern "C" int _write(int fd, char* buf, int len)
+{
+    (void)fd;
+    for (int i = 0; i < len; i++) 
+    {
+        while ((USART1->SR & 0x40) == 0);
+        USART1->DR = (uint8_t)buf[i];
+    }
+    return len;
+}
+#endif
+
 extern "C" void USART1_IRQHandler(void)
 {
     if (USART_GetITStatus(USART1, USART_IT_RXNE) != RESET)

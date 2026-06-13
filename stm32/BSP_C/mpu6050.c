@@ -1,4 +1,4 @@
-#include "MPU6050.h"
+#include "mpu6050.h"
 
 #define PRINT_ACCEL     (0x01)
 #define PRINT_GYRO      (0x02)
