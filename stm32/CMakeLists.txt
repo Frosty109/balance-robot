@@ -76,3 +76,10 @@ add_custom_command(TARGET firmware.elf POST_BUILD
     COMMAND ${CMAKE_SIZE} $<TARGET_FILE:firmware.elf>
     COMMENT "Generating firmware.hex + firmware.bin, printing size"
 )
+
+add_custom_target(flash
+    COMMAND openocd -f ${CMAKE_SOURCE_DIR}/stm32/openocd.cfg
+        -c "program $<TARGET_FILE:firmware.elf> verify reset exit"
+    DEPENDS firmware.elf
+    USES_TERMINAL
+    COMMENT "Flashing firmware via OpenOCD / ST-Link")
