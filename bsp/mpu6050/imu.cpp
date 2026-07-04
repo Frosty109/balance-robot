@@ -1,4 +1,5 @@
 #include <cmath>
+#include <cstdio>   // TEMP: DMP FIFO diagnostics
 
 #include "imu.hpp"
 
@@ -9,7 +10,11 @@ extern "C" {
     #include "DMP/inv_mpu_dmp_motion_driver.h"
 }
 
-Imu::Imu() {}
+Imu::Imu() 
+    : pitch_(0.0f), roll_(0.0f), yaw_(0.0f)
+    , q0_(1.0f), q1_(0.0f), q2_(0.0f), q3_(0.0f)
+    , gyro_{0, 0, 0}, accel_{0, 0, 0}
+{}
 
 const signed char Imu::GYRO_ORIENTATION[9] = {-1, 0, 0,
                                            0,-1, 0,
@@ -50,9 +55,20 @@ void Imu::read()
     long quat[4];
     short sensors {};
 
-    dmp_read_fifo(gyro_, accel_, quat, &sensor_timestamp, &sensors, &more);
+    int ret = dmp_read_fifo(gyro_, accel_, quat, &sensor_timestamp, &sensors, &more);
 
-    if (sensors & INV_WXYZ_QUAT) 
+    // TEMP diagnostic: dump MPU state to see why the FIFO is empty
+    uint8_t uc {0}, pwr {0}, ist {0}, fc[2] {0, 0};
+    i2cRead(DEV_ADDR, 0x6A, 1, &uc);    // USER_CTRL  (expect 0xC0: DMP_EN|FIFO_EN)
+    i2cRead(DEV_ADDR, 0x6B, 1, &pwr);   // PWR_MGMT_1 (bit6=SLEEP, bits2:0=clk src)
+    i2cRead(DEV_ADDR, 0x3A, 1, &ist);   // INT_STATUS (bit1=DMP_INT)
+    i2cRead(DEV_ADDR, 0x72, 2, fc);     // FIFO_COUNT_H/L
+    printf("R=%d cnt=%d UC=%02X PWR=%02X INT=%02X\n",
+           ret, (fc[0] << 8) | fc[1], uc, pwr, ist);
+
+    if (sensors & INV_WXYZ_QUAT)
+
+    if (sensors & INV_WXYZ_QUAT)
     {
         q0_ = quat[0] / q30;
         q1_ = quat[1] / q30;

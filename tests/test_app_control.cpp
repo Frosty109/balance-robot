@@ -21,6 +21,7 @@ public:
     float getAccelZ()       override { return 0.0f; }
     int   getEncoderLeft()  override { return enc_l; }
     int   getEncoderRight() override { return enc_r; }
+    void  poll()            override {}
 };
 
 class MockMotorHal : public IMotorHal

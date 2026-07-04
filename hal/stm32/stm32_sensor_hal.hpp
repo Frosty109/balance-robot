@@ -12,7 +12,7 @@ public:
                    Encoder encoder_right,
                    Battery battery);
 
-    void init();
+    bool init();
 
     float getAngle()        override;
     float getGyroBalance()  override;
@@ -21,6 +21,7 @@ public:
     float getBattery()      override;
     int   getEncoderLeft()  override;
     int   getEncoderRight() override;
+    void  poll()            override;
 
 private:
     Imu     imu_;

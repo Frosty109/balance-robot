@@ -1,3 +1,5 @@
+#include <cstdio>
+
 extern "C" {
     #include "stm32f10x.h"
     #include "sys.h"
@@ -32,13 +34,16 @@ int main()
                            GPIOA, GPIO_Pin_9, GPIO_Pin_10, USART1_IRQn };
     Usart usart(uart_cfg);
     usart.init(115200);
+    setvbuf(stdout, NULL, _IONBF, 0);   // unbuffered: printf hits the UART immediately
 
     Stm32SensorHal sensor_hal(enc_left, enc_right, battery);
     constexpr uint16_t PWM_ARR = 2880;  // 72MHz / 2880 = 25kHz, above audible range
     constexpr uint16_t PWM_PSC = 0;
     Stm32MotorHal  motor_hal(PWM_ARR, PWM_PSC);
 
-    sensor_hal.init();
+    if (!sensor_hal.init())
+        printf("IMU INIT FAILED\n");
+
     motor_hal.init();
 
     AppControl app(sensor_hal, motor_hal,
@@ -49,6 +54,10 @@ int main()
     while (true)
     {
         app.update();
+
+        printf("%d,%d\n", (int)(sensor_hal.getAngle()   * 100),
+                          (int)(sensor_hal.getBattery() * 100));
+
         delay_ms(5);
     }
 }
