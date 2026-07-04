@@ -12,4 +12,5 @@ public:
     virtual float getBattery() = 0;
     virtual int getEncoderLeft() = 0;
     virtual int getEncoderRight() = 0;
+    virtual void poll() = 0;
 };

@@ -13,6 +13,7 @@ void AppControl::reset()
 
 void AppControl::update(float move_x, float move_z)
 {
+    sensor_.poll();
     float angle     = sensor_.getAngle();
     float battery   = sensor_.getBattery();
 
