@@ -37,8 +37,8 @@ void Motor::initGPIO()
 
 void Motor::initPWM(uint16_t arr, uint16_t psc)
 {
-    TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure;
-    TIM_OCInitTypeDef       TIM_OCInitStructure;
+    TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure{};
+    TIM_OCInitTypeDef       TIM_OCInitStructure{};
 
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM8, ENABLE);
     TIM_DeInit(TIM8);
