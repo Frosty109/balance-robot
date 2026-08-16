@@ -1,0 +1,4 @@
+interface:
+  display_name: "Devlog Review"
+  short_description: "Audit notes and identify publishable stories."
+  default_prompt: "Use $devlog-review to find missed stories, artefact debt, and candidate post groupings."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Finish Session"
+  short_description: "Complete all end-of-session documentation."
+  default_prompt: "Use $session-finished to update the session, learning, issues, and optional devlog records."

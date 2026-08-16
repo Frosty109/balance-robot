@@ -22,6 +22,8 @@ const signed char Imu::GYRO_ORIENTATION[9] = {-1, 0, 0,
 
 bool Imu::init()
 {
+    IIC_MPU6050_Init();
+
     MPU6050_initialize();
 
     uint8_t temp[1] {0};
@@ -55,18 +57,26 @@ void Imu::read()
     long quat[4];
     short sensors {};
 
-    int ret = dmp_read_fifo(gyro_, accel_, quat, &sensor_timestamp, &sensors, &more);
+    // int ret = dmp_read_fifo(gyro_, accel_, quat, &sensor_timestamp, &sensors, &more);
 
-    // TEMP diagnostic: dump MPU state to see why the FIFO is empty
-    uint8_t uc {0}, pwr {0}, ist {0}, fc[2] {0, 0};
-    i2cRead(DEV_ADDR, 0x6A, 1, &uc);    // USER_CTRL  (expect 0xC0: DMP_EN|FIFO_EN)
-    i2cRead(DEV_ADDR, 0x6B, 1, &pwr);   // PWR_MGMT_1 (bit6=SLEEP, bits2:0=clk src)
-    i2cRead(DEV_ADDR, 0x3A, 1, &ist);   // INT_STATUS (bit1=DMP_INT)
-    i2cRead(DEV_ADDR, 0x72, 2, fc);     // FIFO_COUNT_H/L
-    printf("R=%d cnt=%d UC=%02X PWR=%02X INT=%02X\n",
-           ret, (fc[0] << 8) | fc[1], uc, pwr, ist);
+    // // TEMP diagnostic: dump MPU state to see why the FIFO is empty
+    // uint8_t uc {0}, pwr {0}, ist {0}, fc[2] {0, 0};
 
-    if (sensors & INV_WXYZ_QUAT)
+    // const int r_uc  = i2cRead(DEV_ADDR, 0x6A, 1, &uc);
+    // const int r_pwr = i2cRead(DEV_ADDR, 0x6B, 1, &pwr);
+    // const int r_ist = i2cRead(DEV_ADDR, 0x3A, 1, &ist);
+    // const int r_fc  = i2cRead(DEV_ADDR, 0x72, 2, fc);
+
+    // printf("R=%d cnt=%u UC=%02X(r%d) PWR=%02X(r%d) "
+    //         "INT=%02X(r%d) FC(r%d)\n",
+    //         ret,
+    //         static_cast<unsigned>((fc[0] << 8) | fc[1]),
+    //         static_cast<unsigned>(uc), r_uc,
+    //         static_cast<unsigned>(pwr), r_pwr,
+    //         static_cast<unsigned>(ist), r_ist,
+    //         r_fc);
+
+    dmp_read_fifo(gyro_, accel_, quat, &sensor_timestamp, &sensors, &more);
 
     if (sensors & INV_WXYZ_QUAT)
     {

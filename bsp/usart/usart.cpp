@@ -66,7 +66,7 @@ void Usart::sendBytes(uint8_t* data, uint16_t length)
 
 extern "C" int fputc(int ch, FILE* f)
 {
-    while ((USART1->SR & 0x40) == 0);
+    while ((USART1->SR & 0x80) == 0);
     USART1->DR = (uint8_t)ch;
     return ch;
 }
@@ -79,7 +79,7 @@ extern "C" int _write(int fd, char* buf, int len)
     (void)fd;
     for (int i = 0; i < len; i++) 
     {
-        while ((USART1->SR & 0x40) == 0);
+        while ((USART1->SR & 0x80) == 0);
         USART1->DR = (uint8_t)buf[i];
     }
     return len;

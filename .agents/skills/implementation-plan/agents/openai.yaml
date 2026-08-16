@@ -1,0 +1,4 @@
+interface:
+  display_name: "Implementation Plan"
+  short_description: "Create a standalone implementation handoff."
+  default_prompt: "Use $implementation-plan to write the discussed work as a complete repository plan."

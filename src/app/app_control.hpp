@@ -19,4 +19,8 @@ private:
     BalancePD   balance_;
     VelocityPI  velocity_;
     TurnPD      turn_;
+
+    bool        faulted_ {false};
+    int         telemetry_tick_ {0};
+    static constexpr int TELEMETRY_DECIMATION {20};
 };

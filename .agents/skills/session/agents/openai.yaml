@@ -1,0 +1,4 @@
+interface:
+  display_name: "Session Handoff"
+  short_description: "Write or update the project session handoff."
+  default_prompt: "Use $session to capture today's work and immediate next steps."
