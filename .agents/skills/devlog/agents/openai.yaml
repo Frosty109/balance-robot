@@ -1,0 +1,4 @@
+interface:
+  display_name: "Devlog Capture"
+  short_description: "Capture strong public-facing build insights."
+  default_prompt: "Use $devlog to capture the most publishable insights and perishable artefacts from this session."
