@@ -1,0 +1,4 @@
+interface:
+  display_name: "Devlog Draft"
+  short_description: "Draft a problem-led public devlog post."
+  default_prompt: "Use $devlog-draft to turn the strongest assigned notes into a publishable draft."

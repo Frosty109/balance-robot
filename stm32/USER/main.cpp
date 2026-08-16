@@ -34,30 +34,40 @@ int main()
                            GPIOA, GPIO_Pin_9, GPIO_Pin_10, USART1_IRQn };
     Usart usart(uart_cfg);
     usart.init(115200);
-    setvbuf(stdout, NULL, _IONBF, 0);   // unbuffered: printf hits the UART immediately
+    setvbuf(stdout, NULL, _IONBF, 0); 
 
     Stm32SensorHal sensor_hal(enc_left, enc_right, battery);
-    constexpr uint16_t PWM_ARR = 2880;  // 72MHz / 2880 = 25kHz, above audible range
+    constexpr uint16_t PWM_ARR = 2880;  // 72MHz / 2880 = 25kHz
     constexpr uint16_t PWM_PSC = 0;
     Stm32MotorHal  motor_hal(PWM_ARR, PWM_PSC);
 
+    printf("BOOT\n");
+
     if (!sensor_hal.init())
+    {
         printf("IMU INIT FAILED\n");
 
+        while (true)
+        {
+            delay_ms(1000);
+        }
+    }
+
+    printf("IMU OK\n");
+
     motor_hal.init();
+    printf("MOTOR OK\n");
 
     AppControl app(sensor_hal, motor_hal,
-                   BalancePD(200.0f, 0.8f, 0.0f),
-                   VelocityPI(1.2f, 0.05f, 200.0f),
-                   TurnPD(5.0f, 0.1f));
+                BalancePD(2000.0f, 78.0f, 0.0f),
+                VelocityPI(0.0f, 0.0f, 200.0f),
+                TurnPD(0.0f, 0.0f));
 
     while (true)
     {
         app.update();
-
-        printf("%d,%d\n", (int)(sensor_hal.getAngle()   * 100),
-                          (int)(sensor_hal.getBattery() * 100));
-
-        delay_ms(5);
+        // delay_ms(5);
     }
 }
+
+    
