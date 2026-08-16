@@ -61,8 +61,8 @@ void AppControl::update(float move_x, float move_z)
     if (++telemetry_tick_ >= TELEMETRY_DECIMATION)
     {
         telemetry_tick_ = 0;
-        printf("angle=%d bal=%d L=%d R=%d\n",
-             (int)(angle * 100), balance, left, right);
+        printf("angle=%d bal=%d L=%d R=%d battery=%d\n",
+             (int)(angle * 100), balance, left, right, int(battery * 100));
     }
 
 }

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Learning Notes"
+  short_description: "Maintain topic-based project learning notes."
+  default_prompt: "Use $learning to record durable concepts learned in this session."

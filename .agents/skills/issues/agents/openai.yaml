@@ -1,0 +1,4 @@
+interface:
+  display_name: "Session Issues"
+  short_description: "Record this session's technical issues."
+  default_prompt: "Use $issues to document problems, causes, and resolutions from this session."

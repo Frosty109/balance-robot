@@ -30,15 +30,16 @@ Objects/
 # .claude/commands/plan.md, because Git on Windows ignores case.
 /PLAN.md
 /CLAUDE.md
-Learning-Journal/
-sessions/
-learning/
-plans/
-claude-config/
-issues/
-devlog/
-content-portfolio-site/
-Yahboom-Self-Balancing-Car/
+/Learning-Journal/
+/sessions/
+/learning/
+/plans/
+/claude-config/
+/codex-config/
+/issues/
+/devlog/
+/content-portfolio-site/
+/Yahboom-Self-Balancing-Car/
 balance-car-cpp-Complete-Rundown.md
 
 # Misc
