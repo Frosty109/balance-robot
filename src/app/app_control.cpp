@@ -14,7 +14,10 @@ void AppControl::reset()
 
 void AppControl::update(float move_x, float move_z)
 {
-    sensor_.poll();
+    if (!sensor_.poll())
+    {
+        return;
+    }
 
     float angle     = sensor_.getAngle();
     float battery   = sensor_.getBattery();
@@ -31,7 +34,7 @@ void AppControl::update(float move_x, float move_z)
         motor_.setMotorPWM(0, 0);
         velocity_.reset();
 
-        if (!faulted_) 
+        if (!faulted_)
         {
             faulted_ = true;
             printf("FAULT angle=%d\n", (int)(angle * 100));

@@ -15,7 +15,7 @@ public:
     float getBattery()      override;
     int   getEncoderLeft()  override;
     int   getEncoderRight() override;
-    void  poll()            override;
+    bool  poll()            override;
 
 private:
     Physics& physics_;
