@@ -24,4 +24,4 @@ float Stm32SensorHal::getAccelZ()       { return imu_.getAccelZ();   }
 float Stm32SensorHal::getBattery()      { return battery_.read();    }
 int   Stm32SensorHal::getEncoderLeft()  { return encoder_left_.read();  }
 int   Stm32SensorHal::getEncoderRight() { return encoder_right_.read(); }
-void  Stm32SensorHal::poll()            { imu_.read(); }
+bool  Stm32SensorHal::poll()            { return imu_.read(); }

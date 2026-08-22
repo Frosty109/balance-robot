@@ -1,5 +1,4 @@
 #include <cmath>
-#include <cstdio>   // TEMP: DMP FIFO diagnostics
 
 #include "imu.hpp"
 
@@ -10,7 +9,7 @@ extern "C" {
     #include "DMP/inv_mpu_dmp_motion_driver.h"
 }
 
-Imu::Imu() 
+Imu::Imu()
     : pitch_(0.0f), roll_(0.0f), yaw_(0.0f)
     , q0_(1.0f), q1_(0.0f), q2_(0.0f), q3_(0.0f)
     , gyro_{0, 0, 0}, accel_{0, 0, 0}
@@ -50,47 +49,65 @@ bool Imu::init()
 
 }
 
-void Imu::read()
+bool Imu::read()
 {
+    short gyro[3] {};
+    short accel[3] {};
+    long quat[4] {};
+
     unsigned long sensor_timestamp {};
     unsigned char more {};
-    long quat[4];
     short sensors {};
 
-    // int ret = dmp_read_fifo(gyro_, accel_, quat, &sensor_timestamp, &sensors, &more);
+    const int result = dmp_read_fifo(
+            gyro,
+            accel,
+            quat,
+            &sensor_timestamp,
+            &sensors,
+            &more
+        );
 
-    // // TEMP diagnostic: dump MPU state to see why the FIFO is empty
-    // uint8_t uc {0}, pwr {0}, ist {0}, fc[2] {0, 0};
+    constexpr short REQUIRED_SENSORS = INV_WXYZ_QUAT | INV_XYZ_GYRO | INV_XYZ_ACCEL;
 
-    // const int r_uc  = i2cRead(DEV_ADDR, 0x6A, 1, &uc);
-    // const int r_pwr = i2cRead(DEV_ADDR, 0x6B, 1, &pwr);
-    // const int r_ist = i2cRead(DEV_ADDR, 0x3A, 1, &ist);
-    // const int r_fc  = i2cRead(DEV_ADDR, 0x72, 2, fc);
-
-    // printf("R=%d cnt=%u UC=%02X(r%d) PWR=%02X(r%d) "
-    //         "INT=%02X(r%d) FC(r%d)\n",
-    //         ret,
-    //         static_cast<unsigned>((fc[0] << 8) | fc[1]),
-    //         static_cast<unsigned>(uc), r_uc,
-    //         static_cast<unsigned>(pwr), r_pwr,
-    //         static_cast<unsigned>(ist), r_ist,
-    //         r_fc);
-
-    dmp_read_fifo(gyro_, accel_, quat, &sensor_timestamp, &sensors, &more);
-
-    if (sensors & INV_WXYZ_QUAT)
+    if (result != 0 || (sensors & REQUIRED_SENSORS) != REQUIRED_SENSORS)
     {
-        q0_ = quat[0] / q30;
-        q1_ = quat[1] / q30;
-        q2_ = quat[2] / q30;
-        q3_ = quat[3] / q30;
-
-        roll_  = asin(-2 * q1_ * q3_ + 2 * q0_ * q2_) * 57.3f;
-        pitch_ = atan2(2 * q2_ * q3_ + 2 * q0_ * q1_,
-                       -2 * q1_ * q1_ - 2 * q2_ * q2_ + 1) * 57.3f;
-        yaw_   = atan2(2 * (q1_ * q2_ + q0_ * q3_),
-                       q0_*q0_ + q1_*q1_ - q2_*q2_ - q3_*q3_) * 57.3f;
+        return false;
     }
+
+    const float q0 = quat[0] / q30;
+    const float q1 = quat[1] / q30;
+    const float q2 = quat[2] / q30;
+    const float q3 = quat[3] / q30;
+
+    const float roll  =
+        asin(-2 * q1 * q3 + 2 * q0 * q2) * 57.3f;
+
+    const float pitch =
+        atan2(2 * q2 * q3 + 2 * q0 * q1,
+             -2 * q1 * q1 - 2 * q2 * q2 + 1) * 57.3f;
+
+    const float yaw =
+        atan2(2 * (q1 * q2 + q0 * q3),
+              q0*q0 + q1*q1 - q2*q2 - q3*q3) * 57.3f;
+
+    q0_ = q0;
+    q1_ = q1;
+    q2_ = q2;
+    q3_ = q3;
+
+    roll_ = roll;
+    pitch_ = pitch;
+    yaw_ = yaw;
+
+    gyro_[0] = gyro[0];
+    gyro_[1] = gyro[1];
+    gyro_[2] = gyro[2];
+
+    accel_[0] = accel[0];
+    accel_[1] = accel[1];
+    accel_[2] = accel[2];
+    return true;
 }
 
 float Imu::getPitch() const { return pitch_; }

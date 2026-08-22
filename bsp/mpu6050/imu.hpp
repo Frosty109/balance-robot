@@ -1,4 +1,4 @@
-#pragma once 
+#pragma once
 
 #include <cstdint>
 
@@ -7,7 +7,7 @@ class Imu
 public:
     Imu();
     bool init();
-    void read();
+    bool read();
 
     float getPitch() const;
     float getRoll()  const;
@@ -30,7 +30,6 @@ private:
     static constexpr uint8_t    WHO_AM_I_VAL {0x68};
 
     static const signed char GYRO_ORIENTATION[9];
-    
     static unsigned short inv_row_2_scale(const signed char* row);
     static unsigned short inv_orientation_matrix_to_scalar (const signed char* mtx);
     static void run_self_test();

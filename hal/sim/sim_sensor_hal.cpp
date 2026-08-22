@@ -11,4 +11,4 @@ float SimSensorHal::getAccelZ()       { return 0.0f;                      }
 float SimSensorHal::getBattery()      { return 12.0f;                     }
 int   SimSensorHal::getEncoderLeft()  { return physics_.getEncoderLeft(); }
 int   SimSensorHal::getEncoderRight() { return physics_.getEncoderRight();}
-void  SimSensorHal::poll()            {}
+bool  SimSensorHal::poll()            { return true; }

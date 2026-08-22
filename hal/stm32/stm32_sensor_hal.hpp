@@ -21,7 +21,7 @@ public:
     float getBattery()      override;
     int   getEncoderLeft()  override;
     int   getEncoderRight() override;
-    void  poll()            override;
+    bool  poll()            override;
 
 private:
     Imu     imu_;
