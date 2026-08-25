@@ -2,13 +2,18 @@
 
 #include "../../hal/interface/i_sensor_hal.hpp"
 #include "../../hal/interface/i_motor_hal.hpp"
+#include "../../hal/interface/i_monotonic_clock.hpp"
 #include "../pid/pid_control.hpp"
 
 class AppControl
 {
 public:
-    AppControl(ISensorHal& sensor, IMotorHal& motor, BalancePD balance,
-                VelocityPI velocity, TurnPD turn);
+    AppControl(ISensorHal& sensor,
+               IMotorHal& motor,
+               IMonotonicClock& clock,
+               BalancePD balance,
+               VelocityPI velocity,
+               TurnPD turn);
 
     void update(float move_x = 0.0f, float move_z = 0.0f);
     void reset();
@@ -16,6 +21,7 @@ public:
 private:
     ISensorHal& sensor_;
     IMotorHal&  motor_;
+    IMonotonicClock& clock_;
     BalancePD   balance_;
     VelocityPI  velocity_;
     TurnPD      turn_;
