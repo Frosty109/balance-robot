@@ -16,6 +16,7 @@ add_executable (sim
     src/app/app_control.cpp
     hal/sim/sim_sensor_hal.cpp
     hal/sim/sim_motor_hal.cpp
+    hal/sim/sim_monotonic_clock.cpp
     simulation/physics.cpp
     simulation/sim_main.cpp
 )

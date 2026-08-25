@@ -56,11 +56,30 @@ public:
     }
 };
 
+class MockMonotonicClock : public IMonotonicClock
+{
+public:
+    std::uint32_t now_ms {0};
+
+    std::uint32_t nowMs() const override
+    {
+        return now_ms;
+    }
+
+    void advance(std::uint32_t elapsed_ms)
+    {
+        now_ms += elapsed_ms;
+    }
+};
+
 TEST(AppControlTest, SafetyCutoffOnHighAngle)
 {
     MockSensorHal sensor;
     MockMotorHal  motor;
-    AppControl    app(sensor, motor,
+    MockMonotonicClock clock;
+    AppControl    app(sensor,
+                     motor,
+                     clock,
                      BalancePD(200.0f, 0.8f, 0.0f),
                      VelocityPI(1.2f, 0.05f, 200.0f),
                      TurnPD(5.0f, 0.1f));
@@ -78,7 +97,10 @@ TEST(AppControlTest, SafetyCutoffOnLowBattery)
 {
     MockSensorHal sensor;
     MockMotorHal  motor;
-    AppControl    app(sensor, motor,
+    MockMonotonicClock clock;
+    AppControl    app(sensor,
+                     motor,
+                     clock,
                      BalancePD(200.0f, 0.8f, 0.0f),
                      VelocityPI(1.2f, 0.05f, 200.0f),
                      TurnPD(5.0f, 0.1f));
@@ -96,10 +118,13 @@ TEST(AppControlTest, NormalPathDrivesMotors)
 {
     MockSensorHal sensor;
     MockMotorHal  motor;
-    AppControl    app(sensor, motor,
-                    BalancePD(200.0f, 0.8f, 0.0f),
-                    VelocityPI(1.2f, 0.05f, 200.0f),
-                    TurnPD(5.0f, 0.1f));
+    MockMonotonicClock clock;
+    AppControl    app(sensor,
+                     motor,
+                     clock,
+                     BalancePD(200.0f, 0.8f, 0.0f),
+                     VelocityPI(1.2f, 0.05f, 200.0f),
+                     TurnPD(5.0f, 0.1f));
 
     sensor.angle    = 5.0f;
     sensor.battery  = 12.0f;
@@ -114,9 +139,11 @@ TEST(AppControlTest, FreshSamplePerformsOneControlUpdate)
 {
     MockSensorHal sensor;
     MockMotorHal motor;
+    MockMonotonicClock clock;
     AppControl app(
         sensor,
         motor,
+        clock,
         BalancePD(200.0f, 0.0f, 0.0f),
         VelocityPI(0.0f, 0.0f, 200.0f),
         TurnPD(0.0f, 0.0f));
@@ -139,10 +166,12 @@ TEST(AppControlTest, NotFreshSampleDoesNotUpdateControl)
 {
     MockSensorHal sensor;
     MockMotorHal motor;
+    MockMonotonicClock clock;
 
     AppControl app(
         sensor,
         motor,
+        clock,
         BalancePD(200.0f, 0.0f, 0.0f),
         VelocityPI(0.0f, 0.0f, 200.0f),
         TurnPD(0.0f, 0.0f));
@@ -178,13 +207,16 @@ TEST(AppControlTest, NotFreshSampleDoesNotAdvanceVelocityState)
 {
     MockSensorHal tested_sensor;
     MockMotorHal tested_motor;
+    MockMonotonicClock tested_clock;
 
     MockSensorHal reference_sensor;
     MockMotorHal reference_motor;
+    MockMonotonicClock reference_clock;
 
     AppControl tested_app(
         tested_sensor,
         tested_motor,
+        tested_clock,
         BalancePD(0.0f, 0.0f, 0.0f),
         VelocityPI(100.0f, 100.0f, 10000.0f),
         TurnPD(0.0f, 0.0f));
@@ -192,6 +224,7 @@ TEST(AppControlTest, NotFreshSampleDoesNotAdvanceVelocityState)
     AppControl reference_app(
         reference_sensor,
         reference_motor,
+        reference_clock,
         BalancePD(0.0f, 0.0f, 0.0f),
         VelocityPI(100.0f, 100.0f, 10000.0f),
         TurnPD(0.0f, 0.0f));
@@ -231,10 +264,12 @@ TEST(AppControlTest, TelemetryDecimationCountsFreshSamples)
 {
     MockSensorHal sensor;
     MockMotorHal motor;
+    MockMonotonicClock clock;
 
     AppControl app(
         sensor,
         motor,
+        clock,
         BalancePD(0.0f, 0.0f, 0.0f),
         VelocityPI(0.0f, 0.0f, 200.0f),
         TurnPD(0.0f, 0.0f));

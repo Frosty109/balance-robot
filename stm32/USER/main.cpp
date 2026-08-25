@@ -11,6 +11,7 @@ extern "C" {
 #include "../../bsp/usart/usart.hpp"
 #include "../../hal/stm32/stm32_sensor_hal.hpp"
 #include "../../hal/stm32/stm32_motor_hal.hpp"
+#include "../../hal/stm32/stm32_monotonic_clock.hpp"
 #include "../../src/app/app_control.hpp"
 
 int main()
@@ -34,7 +35,10 @@ int main()
                            GPIOA, GPIO_Pin_9, GPIO_Pin_10, USART1_IRQn };
     Usart usart(uart_cfg);
     usart.init(115200);
-    setvbuf(stdout, NULL, _IONBF, 0); 
+    setvbuf(stdout, NULL, _IONBF, 0);
+
+    Stm32MonotonicClock clock;
+    clock.init();
 
     Stm32SensorHal sensor_hal(enc_left, enc_right, battery);
     constexpr uint16_t PWM_ARR = 2880;  // 72MHz / 2880 = 25kHz
@@ -58,10 +62,12 @@ int main()
     motor_hal.init();
     printf("MOTOR OK\n");
 
-    AppControl app(sensor_hal, motor_hal,
-                BalancePD(2000.0f, 78.0f, 0.0f),
-                VelocityPI(0.0f, 0.0f, 200.0f),
-                TurnPD(0.0f, 0.0f));
+    AppControl app(sensor_hal,
+                   motor_hal,
+                   clock,
+                   BalancePD(2000.0f, 78.0f, 0.0f),
+                   VelocityPI(0.0f, 0.0f, 200.0f),
+                   TurnPD(0.0f, 0.0f));
 
     while (true)
     {
@@ -69,5 +75,3 @@ int main()
         // delay_ms(5);
     }
 }
-
-    

@@ -1,10 +1,18 @@
 #include "app_control.hpp"
 #include <cstdio>
 
-AppControl::AppControl(ISensorHal& sensor, IMotorHal& motor, BalancePD balance,
-                        VelocityPI velocity, TurnPD turn)
-    : sensor_(sensor), motor_(motor), balance_(balance)
-    , velocity_(velocity), turn_(turn)
+AppControl::AppControl(ISensorHal& sensor,
+                       IMotorHal& motor,
+                       IMonotonicClock& clock,
+                       BalancePD balance,
+                       VelocityPI velocity,
+                       TurnPD turn)
+    : sensor_(sensor),
+      motor_(motor),
+      clock_(clock),
+      balance_(balance),
+      velocity_(velocity),
+      turn_(turn)
 {}
 
 void AppControl::reset()
