@@ -36,6 +36,8 @@ void AppControl::update(float move_x, float move_z)
 
         if (after - last_fresh_ms_ >= STALE_TIMEOUT_MS)
         {
+            // Motors first: the print busy-waits on the USART for ~3 ms, so reporting
+            // before stopping would timestamp a shutdown that has not happened yet.
             motor_.setMotorPWM(0, 0);
             velocity_.reset();
 
@@ -65,6 +67,7 @@ void AppControl::update(float move_x, float move_z)
     {
         motor_.setMotorPWM(0, 0);
         velocity_.reset();
+        consecutive_fresh_ = 0;
 
         if (!faulted_)
         {
@@ -113,6 +116,9 @@ void AppControl::update(float move_x, float move_z)
     if (++telemetry_tick_ >= TELEMETRY_DECIMATION)
     {
         telemetry_tick_ = 0;
+        // poll= is the worst-case poll duration since boot. It stays in the line
+        // because the stale deadline is only meaningful while poll() returns well
+        // inside STALE_TIMEOUT_MS; this is the only thing watching that.
         printf("angle=%d bal=%d L=%d R=%d battery=%d t=%lu poll=%lu\n",
              (int)(angle * 100), balance, left, right, int(battery * 100),
              (unsigned long)clock_.nowMs(),
