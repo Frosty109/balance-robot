@@ -615,8 +615,6 @@ TEST(AppControlTest, RecoveryCounterResetsOnUnsafeAngle)
     sensor.angle = 30.0f;
     app.update();                              // fresh, but out of band
 
-    // An out-of-band sample resets the counter the same way a rejected poll
-    // does: a sample the app declined to act on is not evidence of recovery.
     sensor.angle = 5.0f;
     app.update();                              // count 1, not 3
     EXPECT_EQ(motor.set_calls, 2);
@@ -627,6 +625,48 @@ TEST(AppControlTest, RecoveryCounterResetsOnUnsafeAngle)
 
     app.update();                              // count 3, recovers
     EXPECT_EQ(motor.set_calls, 3);
+    EXPECT_EQ(motor.last_left, 10);
+    EXPECT_EQ(sensor.encoder_left_reads, 2);   // no gated sample touched the PI
+}
+
+TEST(AppControlTest, RecoveryCounterResetsOnAngleFault)
+{
+    MockSensorHal sensor;
+    MockMotorHal motor;
+    MockMonotonicClock clock;
+
+    AppControl app(sensor, motor, clock,
+                   BalancePD(200.0f, 0.0f, 0.0f),
+                   VelocityPI(0.0f, 0.0f, 200.0f),
+                   TurnPD(0.0f, 0.0f));
+
+    sensor.angle = 5.0f;
+    sensor.fresh = true;
+    app.update();
+
+    sensor.fresh = false;
+    clock.advance(25);
+    app.update();
+    ASSERT_EQ(motor.set_calls, 2);
+    ASSERT_EQ(motor.last_left, 0);
+
+    sensor.fresh = true;
+    app.update();
+    app.update();                              // count 2
+
+    sensor.angle = 45.0f;
+    app.update();
+    EXPECT_EQ(motor.set_calls, 3);             // faulted, zero PWM
+
+    sensor.angle = 5.0f;
+    app.update();                              // RECOVERED, count 1 not 3
+    EXPECT_EQ(motor.set_calls, 3);             // <-- red without the fix
+
+    app.update();                              // count 2
+    EXPECT_EQ(motor.set_calls, 3);
+
+    app.update();                              // count 3, recovers
+    EXPECT_EQ(motor.set_calls, 4);
     EXPECT_EQ(motor.last_left, 10);
     EXPECT_EQ(sensor.encoder_left_reads, 2);   // no gated sample touched the PI
 }
