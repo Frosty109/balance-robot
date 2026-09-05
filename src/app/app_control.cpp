@@ -12,7 +12,8 @@ AppControl::AppControl(ISensorHal& sensor,
       clock_(clock),
       balance_(balance),
       velocity_(velocity),
-      turn_(turn)
+      turn_(turn),
+      last_fresh_ms_(clock.nowMs())
 {}
 
 void AppControl::reset()
@@ -22,10 +23,33 @@ void AppControl::reset()
 
 void AppControl::update(float move_x, float move_z)
 {
-    if (!sensor_.poll())
+    const std::uint32_t before = clock_.nowMs();
+    const bool fresh = sensor_.poll();
+    const std::uint32_t after = clock_.nowMs();
+
+    const std::uint32_t poll_ms = after - before;
+    if (poll_ms > max_poll_ms_) { max_poll_ms_ = poll_ms; }
+
+    if (!fresh)
     {
+        consecutive_fresh_ = 0;
+
+        if (after - last_fresh_ms_ >= STALE_TIMEOUT_MS)
+        {
+            motor_.setMotorPWM(0, 0);
+            velocity_.reset();
+
+            if (!stale_)
+            {
+                stale_ = true;
+                printf("STALE last=%lu now=%lu\n", (unsigned long)last_fresh_ms_, (unsigned long)after);
+            }
+        }
+
         return;
     }
+
+    last_fresh_ms_ = after;
 
     float angle     = sensor_.getAngle();
     float battery   = sensor_.getBattery();
@@ -56,6 +80,23 @@ void AppControl::update(float move_x, float move_z)
         printf("RECOVERED angle=%d\n", (int)(angle * 100));
     }
 
+    if (stale_)
+    {
+        if (angle < -CLEAR_ANGLE || angle > CLEAR_ANGLE)
+        {
+            consecutive_fresh_ = 0;
+            return;
+        }
+
+        if (++consecutive_fresh_ < RECOVERY_FRESH_SAMPLES)
+        {
+            return;
+        }
+
+        stale_ = false;
+        consecutive_fresh_ = 0;
+    }
+
     float gyro      = sensor_.getGyroBalance();
     float gyro_z    = sensor_.getGyroTurn();
     int   enc_l     = sensor_.getEncoderLeft();
@@ -72,8 +113,10 @@ void AppControl::update(float move_x, float move_z)
     if (++telemetry_tick_ >= TELEMETRY_DECIMATION)
     {
         telemetry_tick_ = 0;
-        printf("angle=%d bal=%d L=%d R=%d battery=%d\n",
-             (int)(angle * 100), balance, left, right, int(battery * 100));
+        printf("angle=%d bal=%d L=%d R=%d battery=%d t=%lu poll=%lu\n",
+             (int)(angle * 100), balance, left, right, int(battery * 100),
+             (unsigned long)clock_.nowMs(),
+             (unsigned long)max_poll_ms_);
     }
 
 }

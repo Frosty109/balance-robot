@@ -5,6 +5,22 @@
 #include <gtest/gtest.h>
 #include <string>
 
+class MockMonotonicClock : public IMonotonicClock
+{
+public:
+    std::uint32_t now_ms {0};
+
+    std::uint32_t nowMs() const override
+    {
+        return now_ms;
+    }
+
+    void advance(std::uint32_t elapsed_ms)
+    {
+        now_ms += elapsed_ms;
+    }
+};
+
 class MockSensorHal : public ISensorHal
 {
 public:
@@ -18,6 +34,10 @@ public:
     int   encoder_left_reads {0};
     int   encoder_right_reads {0};
     bool  fresh     {true};
+
+    // Optional: when set, poll() consumes poll_duration_ms of mock time.
+    MockMonotonicClock* clock {nullptr};
+    std::uint32_t poll_duration_ms {0};
 
     float getAngle()        override { return angle; }
     float getBattery()      override { return battery; }
@@ -37,6 +57,11 @@ public:
     bool  poll() override
     {
         ++poll_calls;
+        if (clock != nullptr)
+        {
+            clock->advance(poll_duration_ms);
+        }
+
         return fresh;
     }
 };
@@ -53,22 +78,6 @@ public:
         ++set_calls;
         last_left   = left;
         last_right  = right;
-    }
-};
-
-class MockMonotonicClock : public IMonotonicClock
-{
-public:
-    std::uint32_t now_ms {0};
-
-    std::uint32_t nowMs() const override
-    {
-        return now_ms;
-    }
-
-    void advance(std::uint32_t elapsed_ms)
-    {
-        now_ms += elapsed_ms;
     }
 };
 
@@ -306,3 +315,394 @@ TEST(AppControlTest, TelemetryDecimationCountsFreshSamples)
     EXPECT_EQ(sensor.encoder_right_reads, 20);
     EXPECT_EQ(motor.set_calls, 20);
 }
+
+TEST(AppControlTest, StaleDeadlineIsWrapSafe)
+{
+    MockSensorHal sensor;
+    MockMotorHal motor;
+    MockMonotonicClock clock;
+
+    AppControl app(sensor, motor, clock,
+                   BalancePD(200.0f, 0.0f, 0.0f),
+                   VelocityPI(0.0f, 0.0f, 200.0f),
+                   TurnPD(0.0f, 0.0f));
+
+    clock.now_ms = 0xFFFFFFF0u;    // 16 ms before rollover
+    sensor.angle = 5.0f;
+    sensor.fresh = true;
+    app.update();                  // accepted; last_fresh_ms_ = 0xFFFFFFF0
+    ASSERT_EQ(motor.last_left, 10);
+    const int writes_after_fresh = motor.set_calls;
+
+    sensor.fresh = false;
+    clock.advance(24);             // now = 0x00000008, wrapped
+    app.update();
+    EXPECT_EQ(motor.set_calls, writes_after_fresh);   // 24 < 25, no shutdown
+
+    clock.advance(1);              // elapsed is now exactly 25
+    app.update();
+    EXPECT_EQ(motor.set_calls, writes_after_fresh + 1);
+    EXPECT_EQ(motor.last_left, 0);
+    EXPECT_EQ(motor.last_right, 0);
+}
+
+TEST(AppControlTest, RejectedPollBelowDeadlineRetainsPWM)
+{
+    MockSensorHal sensor;
+    MockMotorHal motor;
+    MockMonotonicClock clock;
+
+    AppControl app(sensor, motor, clock,
+                   BalancePD(200.0f, 0.0f, 0.0f),
+                   VelocityPI(0.0f, 0.0f, 200.0f),
+                   TurnPD(0.0f, 0.0f));
+
+    sensor.clock = &clock;
+    sensor.poll_duration_ms = 5;
+    sensor.angle = 5.0f;
+    sensor.fresh = true;
+    app.update();                          // last_fresh_ms_ = 5
+    ASSERT_EQ(motor.last_left, 10);
+    ASSERT_EQ(motor.set_calls, 1);
+
+    sensor.fresh = false;
+    for (int i = 0; i < 4; ++i)
+    {
+        app.update();                      // elapsed 5, 10, 15, 20
+    }
+
+    EXPECT_EQ(sensor.poll_calls, 5);
+    EXPECT_EQ(motor.set_calls, 1);
+    EXPECT_EQ(motor.last_left, 10);
+    EXPECT_EQ(motor.last_right, 10);
+}
+
+TEST(AppControlTest, ShutdownAtExactDeadline)
+{
+    MockSensorHal sensor;
+    MockMotorHal motor;
+    MockMonotonicClock clock;
+
+    AppControl app(sensor, motor, clock,
+                   BalancePD(200.0f, 0.0f, 0.0f),
+                   VelocityPI(0.0f, 0.0f, 200.0f),
+                   TurnPD(0.0f, 0.0f));
+
+    sensor.angle = 5.0f;
+    sensor.fresh = true;
+    app.update();                  // last_fresh_ms_ = 0
+    ASSERT_EQ(motor.set_calls, 1);
+
+    sensor.fresh = false;
+    clock.advance(25);             // elapsed exactly STALE_TIMEOUT_MS
+    app.update();
+
+    EXPECT_EQ(motor.set_calls, 2);
+    EXPECT_EQ(motor.last_left, 0);
+    EXPECT_EQ(motor.last_right, 0);
+}
+
+TEST(AppControlTest, StaleResetsVelocityState)
+{
+    MockSensorHal tested_sensor;
+    MockMotorHal tested_motor;
+    MockMonotonicClock tested_clock;
+
+    MockSensorHal reference_sensor;
+    MockMotorHal reference_motor;
+    MockMonotonicClock reference_clock;
+
+    AppControl tested_app(
+        tested_sensor,
+        tested_motor,
+        tested_clock,
+        BalancePD(0.0f, 0.0f, 0.0f),
+        VelocityPI(100.0f, 100.0f, 10000.0f),
+        TurnPD(0.0f, 0.0f));
+
+    AppControl reference_app(
+        reference_sensor,
+        reference_motor,
+        reference_clock,
+        BalancePD(0.0f, 0.0f, 0.0f),
+        VelocityPI(100.0f, 100.0f, 10000.0f),
+        TurnPD(0.0f, 0.0f));
+
+    tested_sensor.enc_l = 100;
+    tested_sensor.enc_r = 100;
+    reference_sensor.enc_l = 100;
+    reference_sensor.enc_r = 100;
+
+    for (int i = 0; i < 2; ++i)
+    {
+        tested_app.update();
+        reference_app.update();
+    }
+
+    // Both apps must be in lockstep before they diverge.
+    ASSERT_EQ(tested_motor.last_left, reference_motor.last_left);
+    ASSERT_EQ(tested_motor.set_calls, 2);
+
+    // Tested clears its integral by going stale; reference clears it explicitly.
+    tested_sensor.fresh = false;
+    tested_clock.advance(25);
+    tested_app.update();
+    reference_app.reset();
+
+    tested_sensor.fresh = true;
+    tested_sensor.enc_l = 0;
+    tested_sensor.enc_r = 0;
+    reference_sensor.enc_l = 0;
+    reference_sensor.enc_r = 0;
+
+    for (int i = 0; i < 3; ++i)
+    {
+        tested_app.update();       // two gated by recovery, third drives
+    }
+    reference_app.update();
+
+    // Gated recovery samples must not run the control path at all.
+    EXPECT_EQ(tested_sensor.encoder_left_reads, 3);
+    EXPECT_EQ(reference_sensor.encoder_left_reads, 3);
+    EXPECT_EQ(tested_motor.set_calls, 4);      // 2 drive, 1 stale zero, 1 recovered
+    EXPECT_EQ(reference_motor.set_calls, 3);
+
+    EXPECT_EQ(tested_motor.last_left, reference_motor.last_left);
+    EXPECT_EQ(tested_motor.last_right, reference_motor.last_right);
+}
+
+TEST(AppControlTest, RecoveryRequiresThreeConsecutiveFresh)
+{
+    MockSensorHal sensor;
+    MockMotorHal motor;
+    MockMonotonicClock clock;
+
+    AppControl app(sensor, motor, clock,
+                   BalancePD(200.0f, 0.0f, 0.0f),
+                   VelocityPI(0.0f, 0.0f, 200.0f),
+                   TurnPD(0.0f, 0.0f));
+
+    sensor.angle = 5.0f;
+    sensor.fresh = true;
+    app.update();
+    ASSERT_EQ(motor.last_left, 10);
+
+    sensor.fresh = false;
+    clock.advance(25);
+    app.update();
+    ASSERT_EQ(motor.set_calls, 2);
+    ASSERT_EQ(motor.last_left, 0);
+
+    sensor.fresh = true;
+    app.update();
+    app.update();
+
+    EXPECT_EQ(motor.set_calls, 2);             // two fresh is not enough
+    EXPECT_EQ(motor.last_left, 0);
+    EXPECT_EQ(motor.last_right, 0);
+
+    app.update();                              // third clears stale
+
+    EXPECT_EQ(motor.set_calls, 3);
+    EXPECT_EQ(motor.last_left, 10);
+    EXPECT_EQ(motor.last_right, 10);
+}
+
+TEST(AppControlTest, RecoveryCounterResetsOnRejectedPoll)
+{
+    MockSensorHal sensor;
+    MockMotorHal motor;
+    MockMonotonicClock clock;
+
+    AppControl app(sensor, motor, clock,
+                   BalancePD(200.0f, 0.0f, 0.0f),
+                   VelocityPI(0.0f, 0.0f, 200.0f),
+                   TurnPD(0.0f, 0.0f));
+
+    sensor.angle = 5.0f;
+    sensor.fresh = true;
+    app.update();
+
+    sensor.fresh = false;
+    clock.advance(25);
+    app.update();
+    ASSERT_EQ(motor.set_calls, 2);
+    ASSERT_EQ(motor.last_left, 0);
+
+    sensor.fresh = true;
+    app.update();
+    app.update();                              // count 2
+
+    sensor.fresh = false;
+    app.update();                              // count back to 0
+
+    sensor.fresh = true;
+    app.update();                              // count 1, not 3
+
+    EXPECT_EQ(motor.set_calls, 2);
+    EXPECT_EQ(motor.last_left, 0);
+
+    app.update();                              // count 2
+    EXPECT_EQ(motor.set_calls, 2);
+
+    app.update();                              // count 3, recovers
+    EXPECT_EQ(motor.set_calls, 3);
+    EXPECT_EQ(motor.last_left, 10);
+}
+
+TEST(AppControlTest, RecoveryRejectedWhenAngleUnsafe)
+{
+    MockSensorHal sensor;
+    MockMotorHal motor;
+    MockMonotonicClock clock;
+
+    AppControl app(sensor, motor, clock,
+                   BalancePD(200.0f, 0.0f, 0.0f),
+                   VelocityPI(0.0f, 0.0f, 200.0f),
+                   TurnPD(0.0f, 0.0f));
+
+    sensor.angle = 5.0f;
+    sensor.fresh = true;
+    app.update();
+    ASSERT_EQ(sensor.encoder_left_reads, 1);
+
+    sensor.fresh = false;
+    clock.advance(25);
+    app.update();
+    ASSERT_EQ(motor.set_calls, 2);
+    ASSERT_EQ(motor.last_left, 0);
+
+    // 30 deg is outside the +/-10 recovery band but inside the 40 deg fault
+    // threshold, so only the recovery gate can reject these.
+    sensor.angle = 30.0f;
+    sensor.fresh = true;
+    for (int i = 0; i < 3; ++i)
+    {
+        app.update();
+    }
+
+    EXPECT_EQ(motor.set_calls, 2);
+    EXPECT_EQ(motor.last_left, 0);
+    EXPECT_EQ(motor.last_right, 0);
+    EXPECT_EQ(sensor.encoder_left_reads, 1);
+}
+
+TEST(AppControlTest, RecoveryCounterResetsOnUnsafeAngle)
+{
+    MockSensorHal sensor;
+    MockMotorHal motor;
+    MockMonotonicClock clock;
+
+    AppControl app(sensor, motor, clock,
+                   BalancePD(200.0f, 0.0f, 0.0f),
+                   VelocityPI(0.0f, 0.0f, 200.0f),
+                   TurnPD(0.0f, 0.0f));
+
+    sensor.angle = 5.0f;
+    sensor.fresh = true;
+    app.update();
+
+    sensor.fresh = false;
+    clock.advance(25);
+    app.update();
+    ASSERT_EQ(motor.set_calls, 2);
+    ASSERT_EQ(motor.last_left, 0);
+
+    sensor.fresh = true;
+    app.update();
+    app.update();                              // count 2
+
+    sensor.angle = 30.0f;
+    app.update();                              // fresh, but out of band
+
+    // An out-of-band sample resets the counter the same way a rejected poll
+    // does: a sample the app declined to act on is not evidence of recovery.
+    sensor.angle = 5.0f;
+    app.update();                              // count 1, not 3
+    EXPECT_EQ(motor.set_calls, 2);
+    EXPECT_EQ(motor.last_left, 0);
+
+    app.update();                              // count 2
+    EXPECT_EQ(motor.set_calls, 2);
+
+    app.update();                              // count 3, recovers
+    EXPECT_EQ(motor.set_calls, 3);
+    EXPECT_EQ(motor.last_left, 10);
+    EXPECT_EQ(sensor.encoder_left_reads, 2);   // no gated sample touched the PI
+}
+
+TEST(AppControlTest, MaxPollDurationIsRecorded)
+{
+    MockSensorHal sensor;
+    MockMotorHal motor;
+    MockMonotonicClock clock;
+
+    AppControl app(sensor, motor, clock,
+                   BalancePD(200.0f, 0.0f, 0.0f),
+                   VelocityPI(0.0f, 0.0f, 200.0f),
+                   TurnPD(0.0f, 0.0f));
+
+    sensor.clock = &clock;
+    sensor.angle = 5.0f;
+    sensor.fresh = true;
+
+    testing::internal::CaptureStdout();
+
+    sensor.poll_duration_ms = 30;
+    app.update();                              // the one slow poll
+
+    sensor.poll_duration_ms = 1;
+    for (int i = 0; i < 19; ++i)
+    {
+        app.update();                          // 20th fires telemetry
+    }
+
+    const std::string output = testing::internal::GetCapturedStdout();
+
+    EXPECT_NE(output.find("poll=30\n"), std::string::npos);
+    EXPECT_EQ(output.find("poll=1\n"), std::string::npos);   // max, not last
+}
+
+TEST(AppControlTest, StaleEntryPrintsOnce)
+{
+    MockSensorHal sensor;
+    MockMotorHal motor;
+    MockMonotonicClock clock;
+
+    AppControl app(sensor, motor, clock,
+                   BalancePD(200.0f, 0.0f, 0.0f),
+                   VelocityPI(0.0f, 0.0f, 200.0f),
+                   TurnPD(0.0f, 0.0f));
+
+    sensor.angle = 5.0f;
+    sensor.fresh = true;
+    app.update();
+    ASSERT_EQ(motor.set_calls, 1);
+
+    sensor.fresh = false;
+    clock.advance(25);
+
+    testing::internal::CaptureStdout();
+
+    for (int i = 0; i < 200; ++i)
+    {
+        app.update();
+    }
+
+    const std::string output = testing::internal::GetCapturedStdout();
+
+    std::string::size_type stale_lines = 0;
+    for (std::string::size_type pos = output.find("STALE");
+         pos != std::string::npos;
+         pos = output.find("STALE", pos + 1))
+    {
+        ++stale_lines;
+    }
+
+    EXPECT_EQ(stale_lines, 1u);                // report is one-shot
+    EXPECT_EQ(motor.set_calls, 201);                 // shutdown re-asserts
+    EXPECT_EQ(motor.last_left, 0);
+    EXPECT_EQ(motor.last_right, 0);
+}
+
+
