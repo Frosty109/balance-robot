@@ -316,6 +316,50 @@ TEST(AppControlTest, TelemetryDecimationCountsFreshSamples)
     EXPECT_EQ(motor.set_calls, 20);
 }
 
+TEST(AppControlTest, TelemetrySumsEncoderCountsAcrossTheWindow)
+{
+    MockSensorHal sensor;
+    MockMotorHal motor;
+    MockMonotonicClock clock;
+
+    AppControl app(
+        sensor,
+        motor,
+        clock,
+        BalancePD(0.0f, 0.0f, 0.0f),
+        VelocityPI(0.0f, 0.0f, 200.0f),
+        TurnPD(0.0f, 0.0f));
+        
+    // 3 and -5 are chosen so the four plausible mistakes fail differently
+    sensor.enc_l = 3;
+    sensor.enc_r = -5;
+
+    testing::internal::CaptureStdout();
+    for (int i = 0; i < 20; ++i) { app.update(); }
+    const std::string first = testing::internal::GetCapturedStdout();
+
+    EXPECT_NE(first.find("enc_l=60"), std::string::npos);
+    EXPECT_NE(first.find("enc_r=-100"), std::string::npos);
+
+    // Rejected polls must neither print nor accumulate.
+    sensor.fresh = false;
+    testing::internal::CaptureStdout();
+    for (int i = 0; i < 10; ++i) { app.update(); }
+    EXPECT_TRUE(testing::internal::GetCapturedStdout().empty());
+
+    sensor.fresh = true;
+    sensor.enc_l = 1;
+    sensor.enc_r = 1;
+
+    testing::internal::CaptureStdout();
+    for (int i = 0; i < 20; ++i) { app.update(); }
+    const std::string second = testing::internal::GetCapturedStdout();
+
+    EXPECT_NE(second.find("enc_l=20"), std::string::npos);
+    EXPECT_NE(second.find("enc_r=20"), std::string::npos);
+}
+
+
 TEST(AppControlTest, StaleDeadlineIsWrapSafe)
 {
     MockSensorHal sensor;
