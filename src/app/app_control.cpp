@@ -105,6 +105,9 @@ void AppControl::update(float move_x, float move_z)
     int   enc_l     = sensor_.getEncoderLeft();
     int   enc_r     = sensor_.getEncoderRight();
 
+    enc_l_sum_ += enc_l;
+    enc_r_sum_ += enc_r;
+
     int balance  = balance_.compute(angle, gyro);
     int velocity = velocity_.compute(enc_l, enc_r, move_x);
     int turn     = turn_.compute(gyro_z, move_z);
@@ -119,10 +122,14 @@ void AppControl::update(float move_x, float move_z)
         // poll= is the worst-case poll duration since boot. It stays in the line
         // because the stale deadline is only meaningful while poll() returns well
         // inside STALE_TIMEOUT_MS; this is the only thing watching that.
-        printf("angle=%d bal=%d L=%d R=%d battery=%d t=%lu poll=%lu\n",
-             (int)(angle * 100), balance, left, right, int(battery * 100),
+        // enc_* are summed over the whole window: a single 5 ms delta per 100 ms
+        // line is too sparse to read a sign from by hand.
+        printf("angle=%d bal=%d L=%d R=%d enc_l=%d enc_r=%d battery=%d t=%lu poll=%lu\n",
+             (int)(angle * 100), balance, left, right,
+             enc_l_sum_, enc_r_sum_, int(battery * 100),
              (unsigned long)clock_.nowMs(),
              (unsigned long)max_poll_ms_);
+        enc_l_sum_ = 0;
+        enc_r_sum_ = 0;
     }
-
 }

@@ -30,6 +30,8 @@ private:
 
     bool          faulted_ {false};
     int           telemetry_tick_ {0};
+    int           enc_l_sum_ {0};
+    int           enc_r_sum_ {0};
     std::uint32_t max_poll_ms_ {0};
 
     // Stale-data shutdown
