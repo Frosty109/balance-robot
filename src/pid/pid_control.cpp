@@ -43,6 +43,7 @@ int VelocityPI::compute(int encoder_left, int encoder_right, float move_x)
 void VelocityPI::reset()
 {
     encoder_integral_ = 0.0f;
+    encoder_bias_ = 0.0f;
 }
 
 TurnPD::TurnPD(float kp, float kd)
