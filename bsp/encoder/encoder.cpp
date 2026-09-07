@@ -40,7 +40,8 @@ void Encoder::init()
 
     TIM_EncoderInterfaceConfig(tim_, TIM_EncoderMode_TI12, TIM_ICPolarity_Rising, TIM_ICPolarity_Rising);
 
-    TIM_ICInitTypeDef TIM_ICInitStructure{};
+    TIM_ICInitTypeDef TIM_ICInitStructure;
+    TIM_ICStructInit(&TIM_ICInitStructure);
     TIM_ICInitStructure.TIM_ICFilter = 10;
     TIM_ICInit(tim_, &TIM_ICInitStructure);
 
