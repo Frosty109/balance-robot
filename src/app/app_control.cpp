@@ -124,9 +124,12 @@ void AppControl::update(float move_x, float move_z)
         // inside STALE_TIMEOUT_MS; this is the only thing watching that.
         // enc_* are summed over the whole window: a single 5 ms delta per 100 ms
         // line is too sparse to read a sign from by hand.
-        printf("angle=%d bal=%d L=%d R=%d enc_l=%d enc_r=%d battery=%d t=%lu poll=%lu\n",
-             (int)(angle * 100), balance, left, right,
-             enc_l_sum_, enc_r_sum_, int(battery * 100),
+        // i= is the clamped integral state. It cannot be derived from the other
+        // fields: at the limits used early in the Stage 7 walk, the error in
+        // estimating the P term is as large as the whole integral contribution.
+        printf("angle=%d bal=%d i=%d L=%d R=%d enc_l=%d enc_r=%d battery=%d t=%lu poll=%lu\n",
+             (int)(angle * 100), balance, (int)velocity_.integral(),
+             left, right, enc_l_sum_, enc_r_sum_, int(battery * 100),
              (unsigned long)clock_.nowMs(),
              (unsigned long)max_poll_ms_);
         enc_l_sum_ = 0;
