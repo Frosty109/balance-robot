@@ -16,6 +16,7 @@ class VelocityPI
         VelocityPI(float kp, float ki, float integral_limit);
         int compute(int encoder_left, int encoder_right, float move_x = 0.0f);
         void reset();
+        float integral() const { return encoder_integral_; }
 
     private:
         float kp_, ki_, integral_limit_;
