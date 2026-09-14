@@ -105,3 +105,76 @@ Full analysis: `issues/2026-07-04-dmp-fifo-review.md`. Fix plan: `plans/2026-07-
   garbage. Harmless (unused), matches original. Note only.
 - [ ] **Remove temporary diagnostics** — `bsp/mpu6050/imu.cpp` (`<cstdio>` + register-dump
   `printf` in `read()`) and the `main.cpp` debug `printf` loop, once the angle tracks tilt.
+
+## Control safety (noted 2026-09-12 — Stage 7 integral session)
+
+Full analysis: `devlog/artefacts/2026-09-12-stage7-integral-windup-and-fault-recovery.txt`.
+Raw evidence: runs A-D are preserved as
+`devlog/artefacts/2026-09-12-stage7-run-a-ki35-limit200-ground-handled.txt` through
+`devlog/artefacts/2026-09-12-stage7-run-d-ki35-limit500-fault-recovery.txt`; Run E was not
+recoverable and remains operator-transcribed and unverified.
+Plans updated: `plans/2026-08-16-balance-bring-up.md` (Stage 7 integral limit, launch gate),
+`plans/2026-09-05-stage5-encoder-signs-velocity.md` (follow-ups 1 and 2, deferred table).
+
+- [ ] **⭐ No intentional launch gate** — `src/app/app_control.cpp`, `stm32/USER/main.cpp`.
+  Motors run whenever the sample is fresh and `|angle| < 40`, so lifting the car disarms
+  nothing. Demonstrated: body hand-held at ~±3°, both motors at full PWM for the entire
+  8.5 s capture with the wheels free, `L` ~4600 against the 2600 clamp. The angle fault
+  never fires because peak angles stayed at −35.79°/+34.74°. Fix is the disabled/armed
+  state already specified in the bring-up plan. **Blocks free balancing.**
+
+  **Operating rule until it exists: power off before lifting, carrying, repositioning or
+  touching the wheels.** Do not use a past-40° tilt as a stop — recovery is automatic and
+  carries the backlog kick below.
+
+- [ ] **⭐ Encoder backlog defeats the angle-fault integral reset** — `src/app/app_control.cpp:77`
+  returns before the encoder reads at `:105-106`, so `TIM->CNT` accumulates unread for the
+  whole fault. On the first non-faulted sample one read returns the entire backlog and
+  `encoder_integral_` is driven straight back to its clamp — to the same rail it held before
+  the fault. `velocity_.reset()` runs and makes no difference. Measured across three
+  recoveries: backlog windows of 5,034 / −5,077 / 5,542 counts against ~1,100 normal. First
+  post-recovery command reached **L = 43402**, 16.7x the clamp and the largest commanded PWM
+  recorded in the project. That figure is from the Ki=0 run and is pure velocity P, so **Ki=0
+  does not mitigate it — only draining the backlog does.** Same early-return problem exists on
+  the stale path at `:51`.
+
+- [ ] **Velocity integral has no leak term** — `src/pid/pid_control.cpp:28-38`. It is the
+  integral term of a velocity PI controller, and integrating velocity error produces a
+  displacement-like state. There is no decay: with the wheels stopped it holds indefinitely
+  (observed parked at exactly the clamp for 4.2 s), at whatever value the wheels stopped on.
+  Under the hand-held restraint used on 2026-09-12 it parked at or near the clamp for ~28–29%
+  of windows at both limit 200 and limit 500, so raising the limit did not reduce clamp
+  occupancy under those conditions. Needs a policy decision (leak, conditional integration, or
+  reset on blocked/held) rather than a limit value. **Not** a candidate cause of the
+  flat-ground hopping: that predates the Ki=35 experiment, and at Ki=0 the integral contributes
+  nothing to the output.
+
+- [ ] **Flat-ground and mat-edge hopping, cause unknown** — operator-reported, predates any
+  nonzero Ki, resolved by a small push. Two candidates that fit a Ki=0 history: the deadzone
+  discontinuity (`Motor::deadzone()` steps applied PWM through 2602 counts as the command
+  crosses zero, at up to 200 Hz — observed `L` −15 → +1 between consecutive windows), and
+  velocity P amplifying a stall-release against an obstruction. Both untested. A hop capture
+  with the new `i=` field would separate them.
+
+- [ ] **Left/right encoder asymmetry is direction-specific** — reproduced in two captures at
+  identical saturated commands. Forward `enc_l/enc_r` = 1.20 and 1.26; reverse = 0.97 and 1.00.
+  `enc_r` feeds the velocity loop, so any directional bias in the counts becomes a directional
+  controller bias. Cause open: motors, gearboxes, H-bridges, brush geometry, friction and
+  backlash can all behave asymmetrically by direction, so this does not point at the counting.
+  (It is not `42ce5c6` — negating the right count cannot produce a 20% magnitude error.) Test:
+  mark both wheels, drive at fixed PWM for fixed time each way, compare revolutions against
+  counts — wheels differing points at the drivetrain, counts differing at the encoder path.
+
+- [ ] **`Velocity_Kp = 7000` leaves little span margin under hard disturbance** — velocity P
+  alone saturates the usable 0–1300 request span at ~19 counts/sample (~3,700 counts/s).
+  Ground captures peaked at 12.8–15.5 counts/sample, i.e. 69–83% of the span consumed by
+  velocity P, leaving the balance term almost nothing when they push the same way. Kp=7000 is
+  the reference value and the Stage 6 gate passed with it, so this is recorded, not actioned.
+  Weigh before free balancing.
+
+- [ ] **⭐ AGENTS.md contradicts the plans** — it declares Stage 2B the active milestone,
+  lists free-balancing gates that closed weeks ago, and is wrong about `reviews/` being
+  gitignored. As of 2026-09-12 the plans declare a different active milestone (launch gate
+  + encoder backlog drain), so the declared operational source of truth now disagrees with
+  the planning documents. **Reconcile before the next agent-led session**, and cover all
+  remaining pre-free-balance prerequisites, not only the two promoted on 2026-09-12.
