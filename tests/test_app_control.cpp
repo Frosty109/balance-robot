@@ -35,6 +35,12 @@ public:
     int   encoder_right_reads {0};
     bool  fresh     {true};
 
+    bool accumulate_encoders {false}; // Opt in timer model to test backlog
+    int  counts_per_poll_l {0};
+    int  counts_per_poll_r {0};
+    int  pending_l {0};
+    int  pending_r {0};
+
     // Optional: when set, poll() consumes poll_duration_ms of mock time.
     MockMonotonicClock* clock {nullptr};
     std::uint32_t poll_duration_ms {0};
@@ -47,11 +53,23 @@ public:
     int   getEncoderLeft() override
     {
         ++encoder_left_reads;
+        if (accumulate_encoders)
+        {
+            const int count = pending_l;
+            pending_l = 0;
+            return count;
+        }
         return enc_l;
     }
     int   getEncoderRight() override
     {
         ++encoder_right_reads;
+        if (accumulate_encoders)
+        {
+            const int count = pending_r;
+            pending_r = 0;
+            return count;
+        }
         return enc_r;
     }
     bool  poll() override
@@ -60,6 +78,12 @@ public:
         if (clock != nullptr)
         {
             clock->advance(poll_duration_ms);
+        }
+
+        if (accumulate_encoders)
+        {
+            pending_l += counts_per_poll_l;
+            pending_r += counts_per_poll_r;
         }
 
         return fresh;
@@ -505,8 +529,8 @@ TEST(AppControlTest, StaleResetsVelocityState)
     }
     reference_app.update();
 
-    // Gated recovery samples must not run the control path at all.
-    EXPECT_EQ(tested_sensor.encoder_left_reads, 3);
+    // Every fresh sample drains the encoders (includes gated recovery samples)
+    EXPECT_EQ(tested_sensor.encoder_left_reads, 5);
     EXPECT_EQ(reference_sensor.encoder_left_reads, 3);
     EXPECT_EQ(tested_motor.set_calls, 4);      // 2 drive, 1 stale zero, 1 recovered
     EXPECT_EQ(reference_motor.set_calls, 3);
@@ -628,7 +652,7 @@ TEST(AppControlTest, RecoveryRejectedWhenAngleUnsafe)
     EXPECT_EQ(motor.set_calls, 2);
     EXPECT_EQ(motor.last_left, 0);
     EXPECT_EQ(motor.last_right, 0);
-    EXPECT_EQ(sensor.encoder_left_reads, 1);
+    EXPECT_EQ(sensor.encoder_left_reads, 4);
 }
 
 TEST(AppControlTest, RecoveryCounterResetsOnUnsafeAngle)
@@ -670,7 +694,8 @@ TEST(AppControlTest, RecoveryCounterResetsOnUnsafeAngle)
     app.update();                              // count 3, recovers
     EXPECT_EQ(motor.set_calls, 3);
     EXPECT_EQ(motor.last_left, 10);
-    EXPECT_EQ(sensor.encoder_left_reads, 2);   // no gated sample touched the PI
+    EXPECT_EQ(sensor.encoder_left_reads, 7);   // every fresh sample drains (gated or not)
+
 }
 
 TEST(AppControlTest, RecoveryCounterResetsOnAngleFault)
@@ -712,7 +737,7 @@ TEST(AppControlTest, RecoveryCounterResetsOnAngleFault)
     app.update();                              // count 3, recovers
     EXPECT_EQ(motor.set_calls, 4);
     EXPECT_EQ(motor.last_left, 10);
-    EXPECT_EQ(sensor.encoder_left_reads, 2);   // no gated sample touched the PI
+    EXPECT_EQ(sensor.encoder_left_reads, 7);   // no gated sample touched the PI
 }
 
 TEST(AppControlTest, MaxPollDurationIsRecorded)
@@ -788,5 +813,93 @@ TEST(AppControlTest, StaleEntryPrintsOnce)
     EXPECT_EQ(motor.last_left, 0);
     EXPECT_EQ(motor.last_right, 0);
 }
+
+TEST(AppControlTest, AngleFaultBacklogIsDiscardedOnRecovery) 
+{
+    MockSensorHal sensor;
+    MockMotorHal motor;
+    MockMonotonicClock clock;
+
+    AppControl app(sensor, motor, clock,
+                   BalancePD(0.0f, 0.0f, 0.0f),
+                   VelocityPI(100.0f, 0.0f, 100000.0f),
+                   TurnPD(0.0f, 0.0f));
+
+    sensor.accumulate_encoders = true;
+    sensor.angle = 5.0f;
+    sensor.fresh = true;
+
+    app.update();
+
+    ASSERT_EQ(motor.set_calls, 1);
+    ASSERT_EQ(motor.last_left, 0);
+
+    sensor.angle = 45.0f;
+    sensor.counts_per_poll_l = 100;
+    sensor.counts_per_poll_r = 100;
+
+    for (int i = 0; i < 50; ++i)
+    {
+        app.update();            // faulted; the timer keeps counting
+    }
+
+    ASSERT_EQ(motor.last_left, 0); // Fault held the motors stopped
+
+    sensor.angle = 5.0f;
+    sensor.counts_per_poll_l = 0;
+    sensor.counts_per_poll_r = 0;
+
+    app.update();                    // RECOVERED, drives this sample
+
+    EXPECT_EQ(motor.last_left, 0);
+    EXPECT_EQ(motor.last_right, 0);
+}
+
+TEST(AppControlTest, StaleBacklogIsDiscardedOnRecovery)
+{
+    MockSensorHal sensor;
+    MockMotorHal motor;
+    MockMonotonicClock clock;
+
+    AppControl app(sensor, motor, clock,
+                   BalancePD(0.0f, 0.0f, 0.0f),
+                   VelocityPI(100.0f, 0.0f, 100000.0f),
+                   TurnPD(0.0f, 0.0f));
+
+    sensor.accumulate_encoders = true;
+    sensor.angle = 5.0f;
+    sensor.fresh = true;
+
+    app.update();
+    ASSERT_EQ(motor.set_calls, 1);
+    ASSERT_EQ(motor.last_left, 0);
+
+    sensor.fresh = false;
+    sensor.counts_per_poll_l = 100;
+    sensor.counts_per_poll_r = 100;
+
+    clock.advance(25);
+    app.update();                              // STALE at the exact deadline
+
+    for (int i = 0; i < 49; ++i)
+    {
+        app.update();                          // 50 non-fresh polls in total
+    }
+
+    ASSERT_EQ(motor.last_left, 0);
+
+    sensor.fresh = true;
+    sensor.counts_per_poll_l = 0;
+    sensor.counts_per_poll_r = 0;
+
+    for (int i = 0; i < 3; ++i)
+    {
+        app.update();                          // two gated by recovery, third drives
+    }
+
+    EXPECT_EQ(motor.last_left, 0);
+    EXPECT_EQ(motor.last_right, 0);
+}
+
 
 
