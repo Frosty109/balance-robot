@@ -21,13 +21,16 @@ encoder-sign normalisation** (`42ce5c6`); **Stage 6 velocity proportional contro
    `plans/2026-08-16-balance-bring-up.md`. The firmware currently drives whenever the sample is
    fresh and `|angle| < 40`, so lifting the car disarms nothing: a lift capture showed both motors
    at full PWM for the entire 8.5 s run with the wheels free.
-2. **Encoder backlog drain on fault/recovery** — follow-up 1 of
-   `plans/2026-09-05-stage5-encoder-signs-velocity.md`. The fault and stale branches return before
-   the encoder reads, so `TIM->CNT` accumulates unread and one read on recovery drives the velocity
-   integral back to its clamp, defeating `velocity_.reset()` entirely and producing a post-recovery
-   command of 43402 against a 2600 clamp. Setting `Ki` to 0 does not mitigate it.
+2. **Encoder backlog drain on fault/recovery** — **CLOSED 2026-09-18 in `6cad87d`.** The fault and
+   stale branches returned before the encoder reads, so one read on recovery delivered the whole
+   fault's coast-down and produced a post-recovery command of 43402 against a 2600 clamp. The
+   encoders are now read on every fresh sample, ahead of every gate. Verified on restrained
+   hardware, n = 3 recoveries: `devlog/artefacts/2026-09-18-backlog-drain-verification.txt`.
+   Details in follow-up 1 of `plans/2026-09-05-stage5-encoder-signs-velocity.md`.
 
-Evidence for both: `devlog/artefacts/2026-09-12-stage7-integral-windup-and-fault-recovery.txt`.
+Original evidence for both: `devlog/artefacts/2026-09-12-stage7-integral-windup-and-fault-recovery.txt`.
+Working plan for the pair: `plans/2026-09-14-pre-free-balance-safety-pair.md` — Phase A done,
+Phase B (the launch gate) next.
 
 **Stage 7 (velocity integral) is attempted and blocked** behind those two — its acceptance gate
 needs a freely balancing car and was not assessable under hand-held restraint. Do not resume the
@@ -42,7 +45,7 @@ Not until **all** of these are closed:
 |---|---|
 | Stage 2B gates (TIM2 rate, host tests, poll duration, fault injection) | **closed** |
 | Intentional launch gate | **open — active** |
-| Encoder backlog drain on fault/recovery | **open — active** |
+| Encoder backlog drain on fault/recovery | **closed** — `6cad87d`, 2026-09-18 |
 | Stage 3 FIFO/EXTI acquisition decision | open |
 | `mid_angle` trim (Stage 4b) | open; three unreconciled candidates, 0.0f accepted by decision |
 
@@ -58,8 +61,9 @@ Turn control and the battery cutoff remain off.
 **Power off before lifting, carrying, repositioning, or touching the wheels.**
 
 Do not tilt the car past the angle-fault threshold as a way of stopping the motors. The fault is not
-a stop: returning inside ±10° re-arms automatically, and that recovery carries the encoder-backlog
-kick described above. This rule stands until the launch gate exists.
+a stop: returning inside ±10° re-arms automatically and drives on that same sample. The backlog
+kick is gone, but a car held in the air after recovery still runs straight back to full PWM. This
+rule stands until the launch gate exists.
 
 ## Working agreement
 
