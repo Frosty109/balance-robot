@@ -53,6 +53,10 @@ void AppControl::update(float move_x, float move_z)
 
     last_fresh_ms_ = after;
 
+    // Encoder needs to be drained on every fresh sample so gated samples discard counts
+    const int enc_l = sensor_.getEncoderLeft();
+    const int enc_r = sensor_.getEncoderRight();
+
     float angle     = sensor_.getAngle();
     float battery   = sensor_.getBattery();
 
@@ -102,8 +106,6 @@ void AppControl::update(float move_x, float move_z)
 
     float gyro      = sensor_.getGyroBalance();
     float gyro_z    = sensor_.getGyroTurn();
-    int   enc_l     = sensor_.getEncoderLeft();
-    int   enc_r     = sensor_.getEncoderRight();
 
     enc_l_sum_ += enc_l;
     enc_r_sum_ += enc_r;
