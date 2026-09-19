@@ -105,6 +105,19 @@ public:
     }
 };
 
+static int countOccurrences(const std::string& text, const std::string& needle)
+{
+    int count {0};
+    for (std::string::size_type pos = text.find(needle);
+         pos != std::string::npos;
+         pos = text.find(needle, pos + needle.size()))
+    {
+        ++count;
+    }
+    return count;
+}
+
+
 TEST(AppControlTest, SafetyCutoffOnHighAngle)
 {
     MockSensorHal sensor;
@@ -900,6 +913,535 @@ TEST(AppControlTest, StaleBacklogIsDiscardedOnRecovery)
     EXPECT_EQ(motor.last_left, 0);
     EXPECT_EQ(motor.last_right, 0);
 }
+
+TEST(AppControlTest, ArmRejectedOutsideClearBand)
+{
+    MockSensorHal sensor;
+    MockMotorHal motor;
+    MockMonotonicClock clock;
+
+    AppControl app(sensor, motor, clock,
+                   BalancePD(200.0f, 0.0f, 0.0f),
+                   VelocityPI(0.0f, 0.0f, 200.0f),
+                   TurnPD(0.0f, 0.0f));
+
+    sensor.angle = 20.0f;                      // inside the 40° fault, outside the 10° clear band
+
+    app.requestArm();
+    app.update();
+
+    EXPECT_FALSE(app.armed());
+    EXPECT_EQ(motor.last_left, 0);
+    EXPECT_EQ(motor.last_right, 0);
+}
+
+TEST(AppControlTest, ArmRequestIsNotLatched)
+{
+    MockSensorHal sensor;
+    MockMotorHal motor;
+    MockMonotonicClock clock;
+
+    AppControl app(sensor, motor, clock,
+                   BalancePD(200.0f, 0.0f, 0.0f),
+                   VelocityPI(0.0f, 0.0f, 200.0f),
+                   TurnPD(0.0f, 0.0f));
+
+    sensor.angle = 20.0f;
+
+    app.requestArm();
+    app.update();                              // rejected, and the request is cleared
+
+    sensor.angle = 5.0f;
+
+    for (int i = 0; i < 10; ++i)
+    {
+        app.update();                          // safe angle, but no new request
+    }
+
+    EXPECT_FALSE(app.armed());
+    EXPECT_EQ(motor.last_left, 0);
+    EXPECT_EQ(motor.last_right, 0);
+}
+
+TEST(AppControlTest, ArmAcceptedOnFreshInBandSample)
+{
+    MockSensorHal sensor;
+    MockMotorHal motor;
+    MockMonotonicClock clock;
+
+    AppControl app(sensor, motor, clock,
+                   BalancePD(200.0f, 0.0f, 0.0f),
+                   VelocityPI(0.0f, 0.0f, 200.0f),
+                   TurnPD(0.0f, 0.0f));
+
+    sensor.angle = 5.0f;
+
+    app.requestArm();
+    app.update();                              // B1.4: the arming sample drives
+
+    EXPECT_TRUE(app.armed());
+    EXPECT_EQ(motor.last_left, 10);
+    EXPECT_EQ(motor.last_right, 10);
+}
+
+TEST(AppControlTest, NoRestartAfterAngleRecovery)
+{
+    MockSensorHal sensor;
+    MockMotorHal motor;
+    MockMonotonicClock clock;
+
+    AppControl app(sensor, motor, clock,
+                   BalancePD(200.0f, 0.0f, 0.0f),
+                   VelocityPI(0.0f, 0.0f, 200.0f),
+                   TurnPD(0.0f, 0.0f));
+
+    sensor.angle = 5.0f;
+    app.requestArm();
+    app.update();
+
+    EXPECT_TRUE(app.armed());
+    EXPECT_EQ(motor.last_left, 10);            // armed and driving before the fault
+
+    sensor.angle = 45.0f;
+    app.update();                              // FAULT, disarms
+
+    sensor.angle = 5.0f;
+
+    for (int i = 0; i < 50; ++i)
+    {
+        app.update();                          // back in band, no new request
+    }
+
+    EXPECT_FALSE(app.armed());
+    EXPECT_EQ(motor.last_left, 0);
+    EXPECT_EQ(motor.last_right, 0);
+}
+
+TEST(AppControlTest, NoRestartAfterStaleRecovery)
+{
+    MockSensorHal sensor;
+    MockMotorHal motor;
+    MockMonotonicClock clock;
+
+    AppControl app(sensor, motor, clock,
+                   BalancePD(200.0f, 0.0f, 0.0f),
+                   VelocityPI(0.0f, 0.0f, 200.0f),
+                   TurnPD(0.0f, 0.0f));
+
+    sensor.angle = 5.0f;
+    app.requestArm();
+    app.update();
+
+    EXPECT_TRUE(app.armed());
+    EXPECT_EQ(motor.last_left, 10);
+
+    sensor.fresh = false;
+    clock.advance(25);
+
+    testing::internal::CaptureStdout();
+    app.update();                              // STALE at the exact deadline, disarms
+    const std::string output = testing::internal::GetCapturedStdout();
+
+    EXPECT_EQ(countOccurrences(output, "DISARMED reason=stale"), 1);
+
+    sensor.fresh = true;
+
+    for (int i = 0; i < 50; ++i)
+    {
+        app.update();                          // stale recovery completes, no new request
+    }
+
+    EXPECT_FALSE(app.armed());
+    EXPECT_EQ(motor.last_left, 0);
+    EXPECT_EQ(motor.last_right, 0);
+}
+
+TEST(AppControlTest, DisarmedTelemetryReportsState)
+{
+    MockSensorHal sensor;
+    MockMotorHal motor;
+    MockMonotonicClock clock;
+
+    AppControl app(sensor, motor, clock,
+                   BalancePD(200.0f, 0.0f, 0.0f),
+                   VelocityPI(0.0f, 0.0f, 200.0f),
+                   TurnPD(0.0f, 0.0f));
+
+    sensor.angle = 5.0f;                       // upright, but never armed
+
+    testing::internal::CaptureStdout();
+    for (int i = 0; i < 20; ++i) 
+    { 
+        app.update(); 
+    }
+    const std::string output = testing::internal::GetCapturedStdout();
+
+    EXPECT_EQ(countOccurrences(output, "state=DISARMED"), 1);
+    EXPECT_EQ(countOccurrences(output, "bal="), 0);    // no armed-format line
+    EXPECT_EQ(motor.last_left, 0);
+}
+
+TEST(AppControlTest, RearmStartsAFullTelemetryWindow)
+{
+    MockSensorHal sensor;
+    MockMotorHal motor;
+    MockMonotonicClock clock;
+
+    AppControl app(sensor, motor, clock,
+                   BalancePD(200.0f, 0.0f, 0.0f),
+                   VelocityPI(0.0f, 0.0f, 200.0f),
+                   TurnPD(0.0f, 0.0f));
+
+    sensor.angle = 5.0f;
+    sensor.enc_l = 3; // first-window counts, distinct from the second
+    sensor.enc_r = 3;
+
+    app.requestArm();
+    for (int i = 0; i < 10; ++i) 
+    { 
+        app.update(); // half an armed window
+    }     
+
+    app.requestDisarm();
+    for (int i = 0; i < 5; ++i) 
+    { 
+        app.update(); // disarmed samples
+    }      
+
+    sensor.enc_l = 1;
+    sensor.enc_r = 1;
+
+    testing::internal::CaptureStdout();
+    app.requestArm();
+    for (int i = 0; i < 19; ++i) 
+    { 
+        app.update(); // re-armed, one short of a window
+    }     
+    const std::string partial = testing::internal::GetCapturedStdout();
+
+    EXPECT_EQ(countOccurrences(partial, "bal="), 0);
+
+    testing::internal::CaptureStdout();
+    app.update();                                      // 20th driving sample since re-arm
+    const std::string full = testing::internal::GetCapturedStdout();
+
+    EXPECT_EQ(countOccurrences(full, "bal="), 1);
+    EXPECT_NE(full.find("enc_l=20"), std::string::npos);
+    EXPECT_NE(full.find("enc_r=20"), std::string::npos);
+}
+
+TEST(AppControlTest, TransitionsPrintOnce)
+{
+    MockSensorHal sensor;
+    MockMotorHal motor;
+    MockMonotonicClock clock;
+
+    AppControl app(sensor, motor, clock,
+                   BalancePD(200.0f, 0.0f, 0.0f),
+                   VelocityPI(0.0f, 0.0f, 200.0f),
+                   TurnPD(0.0f, 0.0f));
+
+    sensor.angle = 5.0f;
+    app.requestArm();
+    app.update();
+
+    sensor.angle = 45.0f;
+
+    testing::internal::CaptureStdout();
+    for (int i = 0; i < 200; ++i) 
+    { 
+        app.update(); // held in the fault
+    }    
+    const std::string output = testing::internal::GetCapturedStdout();
+
+    EXPECT_EQ(countOccurrences(output, "DISARMED reason=angle"), 1);
+    EXPECT_EQ(countOccurrences(output, "DISARMED reason="), 1);  // no other disarm reason either
+    EXPECT_EQ(countOccurrences(output, "FAULT"), 1);
+    EXPECT_EQ(motor.last_left, 0);
+}
+
+TEST(AppControlTest, ArmRejectedOnAngleRecoverySample)
+{
+    MockSensorHal sensor;
+    MockMotorHal motor;
+    MockMonotonicClock clock;
+
+    AppControl app(sensor, motor, clock,
+                   BalancePD(200.0f, 0.0f, 0.0f),
+                   VelocityPI(0.0f, 0.0f, 200.0f),
+                   TurnPD(0.0f, 0.0f));
+
+    sensor.angle = 45.0f;
+    app.update();                              // FAULT
+
+    sensor.angle = 5.0f;                       // inside the clear band
+
+    testing::internal::CaptureStdout();
+    app.requestArm();
+    app.update();                              // clears the fault; the request is refused
+    const std::string output = testing::internal::GetCapturedStdout();
+
+    EXPECT_EQ(countOccurrences(output, "RECOVERED"), 1);
+    EXPECT_EQ(countOccurrences(output, "ARM REJECTED reason=recovering"), 1);
+    EXPECT_FALSE(app.armed());
+    EXPECT_EQ(motor.last_left, 0);
+
+    for (int i = 0; i < 10; ++i)
+    {
+        app.update();                          // safe and upright, no new request
+    }
+
+    EXPECT_FALSE(app.armed());
+    EXPECT_EQ(motor.last_left, 0);
+}
+
+TEST(AppControlTest, ArmRejectedWhileStaleRecovering)
+{
+    MockSensorHal sensor;
+    MockMotorHal motor;
+    MockMonotonicClock clock;
+
+    AppControl app(sensor, motor, clock,
+                   BalancePD(200.0f, 0.0f, 0.0f),
+                   VelocityPI(0.0f, 0.0f, 200.0f),
+                   TurnPD(0.0f, 0.0f));
+
+    sensor.angle = 5.0f;
+
+    sensor.fresh = false;
+    clock.advance(25);
+    app.update();                              // STALE
+
+    sensor.fresh = true;
+
+    testing::internal::CaptureStdout();
+    app.requestArm();
+    app.update();                              // recovery sample 1
+    app.requestArm();
+    app.update();                              // recovery sample 2
+    const std::string gated = testing::internal::GetCapturedStdout();
+
+    EXPECT_EQ(countOccurrences(gated, "ARM REJECTED reason=recovering"), 2);
+    EXPECT_FALSE(app.armed());
+    EXPECT_EQ(motor.last_left, 0);
+
+    testing::internal::CaptureStdout();
+    app.requestArm();
+    app.update();                              // sample 3: stale clears, then the gate accepts
+    const std::string accepted = testing::internal::GetCapturedStdout();
+
+    EXPECT_EQ(countOccurrences("\n" + accepted, "\nARMED angle="), 1);
+    EXPECT_TRUE(app.armed());
+    EXPECT_EQ(motor.last_left, 10);
+}
+
+TEST(AppControlTest, BootsDisarmedAndCommandsZero)
+{
+    MockSensorHal sensor;
+    MockMotorHal motor;
+    MockMonotonicClock clock;
+
+    AppControl app(sensor, motor, clock,
+                   BalancePD(200.0f, 0.0f, 0.0f),
+                   VelocityPI(0.0f, 0.0f, 200.0f),
+                   TurnPD(0.0f, 0.0f));
+
+    motor.last_left = 999;                     // whatever the outputs held before main ran
+    motor.last_right = 999;
+
+    testing::internal::CaptureStdout();
+    app.requestDisarm();                       // main's boot step, before any update
+    const std::string output = testing::internal::GetCapturedStdout();
+
+    EXPECT_FALSE(app.armed());
+    EXPECT_EQ(motor.set_calls, 1);
+    EXPECT_EQ(motor.last_left, 0);
+    EXPECT_EQ(motor.last_right, 0);
+    EXPECT_EQ(countOccurrences(output, "DISARMED reason=operator"), 0);   // it was never armed
+
+    sensor.angle = 5.0f;
+    app.update();                              // upright, fresh, no request
+
+    EXPECT_EQ(motor.last_left, 0);
+}
+
+TEST(AppControlTest, DisarmCommandsZeroImmediately)
+{
+    MockSensorHal sensor;
+    MockMotorHal motor;
+    MockMonotonicClock clock;
+
+    AppControl app(sensor, motor, clock,
+                   BalancePD(200.0f, 0.0f, 0.0f),
+                   VelocityPI(0.0f, 0.0f, 200.0f),
+                   TurnPD(0.0f, 0.0f));
+
+    sensor.angle = 5.0f;
+    app.requestArm();
+    app.update();
+
+    EXPECT_TRUE(app.armed());
+    EXPECT_EQ(motor.last_left, 10);
+    EXPECT_EQ(motor.set_calls, 1);
+
+    testing::internal::CaptureStdout();
+    app.requestDisarm();                       // no update() follows
+    const std::string output = testing::internal::GetCapturedStdout();
+
+    EXPECT_FALSE(app.armed());
+    EXPECT_EQ(motor.set_calls, 2);             // the disarm call itself wrote the motors
+    EXPECT_EQ(motor.last_left, 0);
+    EXPECT_EQ(motor.last_right, 0);
+    EXPECT_EQ(countOccurrences(output, "DISARMED reason=operator"), 1);
+}
+
+TEST(AppControlTest, DisarmResetsVelocityState)
+{
+    MockSensorHal tested_sensor;
+    MockMotorHal tested_motor;
+    MockMonotonicClock tested_clock;
+
+    MockSensorHal reference_sensor;
+    MockMotorHal reference_motor;
+    MockMonotonicClock reference_clock;
+
+    AppControl tested_app(tested_sensor, tested_motor, tested_clock,
+                          BalancePD(0.0f, 0.0f, 0.0f),
+                          VelocityPI(100.0f, 100.0f, 10000.0f),
+                          TurnPD(0.0f, 0.0f));
+
+    AppControl reference_app(reference_sensor, reference_motor, reference_clock,
+                             BalancePD(0.0f, 0.0f, 0.0f),
+                             VelocityPI(100.0f, 100.0f, 10000.0f),
+                             TurnPD(0.0f, 0.0f));
+
+    tested_sensor.enc_l = 100;
+    tested_sensor.enc_r = 100;
+    reference_sensor.enc_l = 100;
+    reference_sensor.enc_r = 100;
+
+    tested_app.requestArm();
+    reference_app.requestArm();
+
+    for (int i = 0; i < 2; ++i)
+    {
+        tested_app.update();
+        reference_app.update();
+    }
+
+    EXPECT_TRUE(tested_app.armed());
+    ASSERT_EQ(tested_motor.last_left, reference_motor.last_left);
+
+    // Tested clears its state by disarming and re-arming; reference clears it explicitly.
+    tested_app.requestDisarm();
+    tested_app.requestArm();
+    reference_app.reset();
+
+    tested_sensor.enc_l = 50;
+    tested_sensor.enc_r = 50;
+    reference_sensor.enc_l = 50;
+    reference_sensor.enc_r = 50;
+
+    tested_app.update();
+    reference_app.update();
+
+    EXPECT_TRUE(tested_app.armed());
+    EXPECT_NE(reference_motor.last_left, 0);   // a real command, not a disarmed zero
+    EXPECT_EQ(tested_motor.last_left, reference_motor.last_left);
+    EXPECT_EQ(tested_motor.last_right, reference_motor.last_right);
+}
+
+TEST(AppControlTest, RepeatedArmRequestIsNoOp)
+{
+    MockSensorHal tested_sensor;
+    MockMotorHal tested_motor;
+    MockMonotonicClock tested_clock;
+
+    MockSensorHal reference_sensor;
+    MockMotorHal reference_motor;
+    MockMonotonicClock reference_clock;
+
+    AppControl tested_app(tested_sensor, tested_motor, tested_clock,
+                          BalancePD(0.0f, 0.0f, 0.0f),
+                          VelocityPI(100.0f, 100.0f, 10000.0f),
+                          TurnPD(0.0f, 0.0f));
+
+    AppControl reference_app(reference_sensor, reference_motor, reference_clock,
+                             BalancePD(0.0f, 0.0f, 0.0f),
+                             VelocityPI(100.0f, 100.0f, 10000.0f),
+                             TurnPD(0.0f, 0.0f));
+
+    tested_sensor.enc_l = 100;
+    tested_sensor.enc_r = 100;
+    reference_sensor.enc_l = 100;
+    reference_sensor.enc_r = 100;
+
+    tested_app.requestArm();
+    reference_app.requestArm();
+
+    for (int i = 0; i < 2; ++i)
+    {
+        tested_app.update();
+        reference_app.update();
+    }
+
+    tested_app.requestArm();                   // key repeat while already armed
+
+    testing::internal::CaptureStdout();
+    for (int i = 0; i < 18; ++i) { tested_app.update(); }
+    const std::string tested_output = testing::internal::GetCapturedStdout();
+
+    testing::internal::CaptureStdout();
+    for (int i = 0; i < 18; ++i) { reference_app.update(); }
+    const std::string reference_output = testing::internal::GetCapturedStdout();
+
+    EXPECT_TRUE(tested_app.armed());
+    EXPECT_EQ(countOccurrences("\n" + tested_output, "\nARMED angle="), 0);
+    EXPECT_EQ(countOccurrences(tested_output, "bal="), 1);     // 2 + 18 = one full window
+    EXPECT_EQ(tested_output, reference_output);
+    EXPECT_EQ(tested_motor.last_left, reference_motor.last_left);
+}
+
+TEST(AppControlTest, ArmingSampleSeesOnlyItsOwnCounts)
+{
+    MockSensorHal sensor;
+    MockMotorHal motor;
+    MockMonotonicClock clock;
+
+    AppControl app(sensor, motor, clock,
+                   BalancePD(0.0f, 0.0f, 0.0f),
+                   VelocityPI(100.0f, 0.0f, 100000.0f),
+                   TurnPD(0.0f, 0.0f));
+
+    sensor.accumulate_encoders = true;
+    sensor.counts_per_poll_l = 100;
+    sensor.counts_per_poll_r = 100;
+    sensor.angle = 5.0f;
+
+    for (int i = 0; i < 50; ++i)
+    {
+        app.update();                          // disarmed; wheels turning (e.g. pushed by hand)
+    }
+
+    EXPECT_EQ(sensor.encoder_left_reads, 50);  // disarmed samples still drain
+
+    app.requestArm();
+    app.update();                              // arming sample: one sample's 100 counts
+
+    EXPECT_TRUE(app.armed());
+    EXPECT_GT(motor.last_left, 0);
+    EXPECT_LT(motor.last_left, 100);           // ~32 for one sample; ~1632 with a 5000 backlog
+}
+
+
+
+
+
+
+
+
+
+
 
 
 

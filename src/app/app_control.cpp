@@ -21,6 +21,14 @@ void AppControl::reset()
     velocity_.reset();
 }
 
+void AppControl::requestArm()
+{
+}
+
+void AppControl::requestDisarm()
+{
+}
+
 void AppControl::update(float move_x, float move_z)
 {
     const std::uint32_t before = clock_.nowMs();

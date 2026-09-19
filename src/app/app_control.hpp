@@ -20,6 +20,10 @@ public:
     void update(float move_x = 0.0f, float move_z = 0.0f);
     void reset();
 
+    void requestArm();
+    void requestDisarm();
+    bool armed() const { return armed_; }
+
 private:
     ISensorHal& sensor_;
     IMotorHal&  motor_;
@@ -38,6 +42,10 @@ private:
     std::uint32_t last_fresh_ms_ {0};
     int           consecutive_fresh_ {0};
     bool          stale_ {false};
+
+    // Launch gate
+    bool armed_ {false};
+    bool arm_requested_ {false};
 
     static constexpr int TELEMETRY_DECIMATION {20};
     static constexpr std::uint32_t STALE_TIMEOUT_MS {25};
