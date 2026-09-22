@@ -13,6 +13,10 @@ stale-data motor shutdown** (all four gates passed, verified on a clean image 20
 encoder-sign normalisation** (`42ce5c6`); **Stage 6 velocity proportional control** at the reference
 `BalancePD(10200, 78, 0)` / `VelocityPI(7000, 0, 200)`, gate met on restrained hardware 2026-09-09.
 
+**The car balances freely.** Recorded 2026-09-22 on the operator's report: pressing `a` stands it
+up and it holds. It has been doing so for some time — **the first free-standing run is not dated in
+the project record and no telemetry capture of one exists.** That gap is the top item below.
+
 **The pre-free-balance safety pair is closed**, both halves verified on restrained hardware:
 
 1. **Intentional launch gate** — **CLOSED 2026-09-22** in `09009ca` (application state and
@@ -33,30 +37,51 @@ encoder-sign normalisation** (`42ce5c6`); **Stage 6 velocity proportional contro
 
 Original evidence for both: `devlog/artefacts/2026-09-12-stage7-integral-windup-and-fault-recovery.txt`.
 Working plan for the pair: `plans/2026-09-14-pre-free-balance-safety-pair.md` — Phases A, B and C
-done. Phase D (the remaining gate to free balancing) is next.
+done. **The active plan is now `plans/2026-09-22-phase-d-to-first-free-balance.md`**, which breaks
+Phase D into steps with acceptance gates and is written to be actionable without prior context.
 
-**Stage 7 (velocity integral) is attempted and blocked** — its acceptance gate needs a freely
-balancing car and was not assessable under hand-held restraint, so it now waits on Stage 3 and
-`mid_angle` rather than on the safety pair. Do not resume the integral-limit walk without reading
-the correction in that plan; `Ki` is back to 0, the last gate-passing value.
+**Stage 7 (velocity integral) is the active task, and is no longer blocked.** It was halted on
+2026-09-12 for one stated reason — its gate needs a freely balancing car and was not assessable
+under hand-held restraint. That car now exists, so the blocker is gone, and the integral is the
+control term that addresses the steady lean described above. Do not resume the integral-limit walk
+without reading the correction in follow-up 2 of
+`plans/2026-09-05-stage5-encoder-signs-velocity.md`; `Ki` is back to 0, the last gate-passing value.
 
-### Free balancing is prohibited
+### Free balancing — achieved, and what that changed
 
-Not until **all** of these are closed:
+This section was headed "Free balancing is prohibited" until 2026-09-22. It no longer is: the car
+stands up on an `a` and holds. The table below was written as a set of gates *to* free balancing;
+since free balancing happened without two of them, they are recorded here for what they actually
+are — safety work that is done, and robustness work that is not.
 
-| Prerequisite | State |
+**Closed, and load-bearing:**
+
+| Item | State |
 |---|---|
 | Stage 2B gates (TIM2 rate, host tests, poll duration, fault injection) | **closed** |
-| Intentional launch gate | **closed** — `09009ca` + `ab08218`, 2026-09-22; B7 rows 1 and 8 not run, see the plan |
+| Intentional launch gate | **closed** — `09009ca` + `ab08218`, 2026-09-22; B7 rows 1 and 8 not run |
 | Encoder backlog drain on fault/recovery | **closed** — `6cad87d`, 2026-09-18 |
-| Stage 3 FIFO/EXTI acquisition decision | **open — active** |
-| `mid_angle` trim (Stage 4b) | **open — active**; three unreconciled candidates, 0.0f accepted by decision |
 
-Also open, on their own triggers rather than this gate: battery cutoff restoration (commented out at
-`src/app/app_control.cpp:60`, needed before unattended running) and the turn sign fix (Stage 9, moot
-while `TurnPD(0,0)`).
+**Open — robustness, not gates.** These were listed as blocking free balancing and demonstrably
+did not block it. They still matter, for different reasons than originally claimed:
 
-Tuning gains and enabling velocity control are **no longer prohibited** — Stages 5 and 6 closed that.
+| Item | Why it still matters |
+|---|---|
+| Stage 3 FIFO/EXTI acquisition decision | bounded sample age is a phase-lag question; it affects how *reliably* the car balances, not whether it can |
+| `mid_angle` trim (Stage 4b) | a midpoint error biases every control decision; the car balancing at `0.0f` is itself evidence worth reading — see below |
+| Battery cutoff restoration | commented out at `src/app/app_control.cpp:60`, and the threshold is `9.6f` against an **8.4 V pack**, so it would fire permanently if uncommented. Blocked behind a known-bad ADC measurement chain. Needed before unattended running |
+| B7 rows 1 and 8 | the startup purge is verified nowhere — not by any host test |
+| Turn sign fix (Stage 9) | moot while `TurnPD(0,0)` |
+
+**The observed symptom, and what it means.** The car sits with a slight backward lean. There is
+**no integrator anywhere in the control path** — `BalancePD` is PD only, and `VelocityPI` runs at
+`Ki = 0` — so a constant disturbance necessarily produces a constant steady-state error. A cable
+tug and a centre-of-mass offset are indistinguishable from the lean alone. `enc_l`/`enc_r` in the
+armed telemetry discriminate: sums near zero with a steady non-zero `angle=` means it is holding a
+lean and staying put; consistently negative sums mean it is creeping. The steady `angle=` value is
+itself a `mid_angle` candidate measured on a freely balancing car, which is better evidence than
+the three hand measurements on record.
+
 Turn control and the battery cutoff remain off.
 
 ### Operating rule on hardware
@@ -69,7 +94,8 @@ recovery prints `RECOVERED` and does not drive, and only an explicit `a` starts 
 
 Power off remains the fallback, and the only stop that does not depend on the serial link. The link
 is not a dead-man switch: if the terminal stops responding while the car is armed, cut power rather
-than approaching it.
+than approaching it. This matters more now the car balances freely than it did when every run was
+hand-held — an armed car on the floor is not under anyone's hand.
 
 A past-40° tilt is now a real stop rather than a pause, but it is a worse one than a keystroke —
 it ends with the car at an angle in your hands. Use the disarm byte.
