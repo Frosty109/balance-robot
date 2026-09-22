@@ -116,18 +116,21 @@ recoverable and remains operator-transcribed and unverified.
 Plans updated: `plans/2026-08-16-balance-bring-up.md` (Stage 7 integral limit, launch gate),
 `plans/2026-09-05-stage5-encoder-signs-velocity.md` (follow-ups 1 and 2, deferred table).
 
-- [ ] **⭐ No intentional launch gate** — `src/app/app_control.cpp`, `stm32/USER/main.cpp`.
+- [x] **⭐ No intentional launch gate** — **CLOSED 2026-09-22.** — `src/app/app_control.cpp`, `stm32/USER/main.cpp`.
   Motors run whenever the sample is fresh and `|angle| < 40`, so lifting the car disarms
   nothing. Demonstrated: body hand-held at ~±3°, both motors at full PWM for the entire
   8.5 s capture with the wheels free, `L` ~4600 against the 2600 clamp. The angle fault
-  never fires because peak angles stayed at −35.79°/+34.74°. Fix is the disabled/armed
-  state already specified in the bring-up plan. **Blocks free balancing.**
+  never fires because peak angles stayed at −35.79°/+34.74°. Fixed by the disabled/armed
+  state specified in the bring-up plan, built in Phase B of
+  `plans/2026-09-14-pre-free-balance-safety-pair.md`.
 
-  **Operating rule until it exists: power off before lifting, carrying, repositioning or
-  touching the wheels.** Do not use a past-40° tilt as a stop — recovery is automatic and
-  carries the backlog kick below.
+  Verified on restrained hardware 2026-09-22,
+  `devlog/artefacts/2026-09-22-launch-gate-verification.txt`: 11 arm transitions, every one
+  preceded by an operator `a` byte, none spurious, across 12 faults and 14 boots. B7 rows 1
+  (startup purge) and 8 (stale) were skipped by decision and remain unobserved on hardware.
 
-- [ ] **⭐ Encoder backlog defeats the angle-fault integral reset** — `src/app/app_control.cpp:77`
+- [x] **⭐ Encoder backlog defeats the angle-fault integral reset** — **CLOSED 2026-09-18** in
+  `6cad87d`; verified n = 3, `devlog/artefacts/2026-09-18-backlog-drain-verification.txt`. — `src/app/app_control.cpp:77`
   returns before the encoder reads at `:105-106`, so `TIM->CNT` accumulates unread for the
   whole fault. On the first non-faulted sample one read returns the entire backlog and
   `encoder_integral_` is driven straight back to its clamp — to the same rail it held before
@@ -137,6 +140,12 @@ Plans updated: `plans/2026-08-16-balance-bring-up.md` (Stage 7 integral limit, l
   recorded in the project. That figure is from the Ki=0 run and is pure velocity P, so **Ki=0
   does not mitigate it — only draining the backlog does.** Same early-return problem exists on
   the stale path at `:51`.
+
+- [ ] **`SafetyCutoffOnLowBattery` is a vacuous test** — `tests/test_app_control.cpp:142`. The
+  battery cutoff it names is commented out at `src/app/app_control.cpp:60`, and the test drives
+  angle 0, which produces zero balance output anyway — so it would pass whether or not a cutoff
+  existed. It is not evidence of anything. Logged 2026-09-22; fix it when the battery cutoff is
+  restored, not before, so the test and the feature land together.
 
 - [ ] **Velocity integral has no leak term** — `src/pid/pid_control.cpp:28-38`. It is the
   integral term of a velocity PI controller, and integrating velocity error produces a
