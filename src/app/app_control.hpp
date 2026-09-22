@@ -46,6 +46,9 @@ private:
     // Launch gate
     bool armed_ {false};
     bool arm_requested_ {false};
+    void disarm(const char* reason);
+    void rejectPendingArm(const char* reason);
+    void resetTelemetryWindow();
 
     static constexpr int TELEMETRY_DECIMATION {20};
     static constexpr std::uint32_t STALE_TIMEOUT_MS {25};

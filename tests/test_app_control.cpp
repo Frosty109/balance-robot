@@ -175,6 +175,7 @@ TEST(AppControlTest, NormalPathDrivesMotors)
     sensor.angle    = 5.0f;
     sensor.battery  = 12.0f;
 
+    app.requestArm();
     app.update();
 
     EXPECT_EQ(motor.last_left, 10);
@@ -197,6 +198,7 @@ TEST(AppControlTest, FreshSamplePerformsOneControlUpdate)
     sensor.fresh = true;
     sensor.angle = 5.0f;
 
+    app.requestArm();
     app.update();
 
     EXPECT_EQ(sensor.poll_calls, 1);
@@ -224,6 +226,7 @@ TEST(AppControlTest, NotFreshSampleDoesNotUpdateControl)
 
     sensor.fresh = true;
     sensor.angle = 5.0f;
+    app.requestArm();
     app.update();
 
     ASSERT_EQ(motor.last_left, 10);
@@ -371,6 +374,7 @@ TEST(AppControlTest, TelemetrySumsEncoderCountsAcrossTheWindow)
     sensor.enc_l = 3;
     sensor.enc_r = -5;
 
+    app.requestArm();
     testing::internal::CaptureStdout();
     for (int i = 0; i < 20; ++i) { app.update(); }
     const std::string first = testing::internal::GetCapturedStdout();
@@ -411,6 +415,7 @@ TEST(AppControlTest, StaleDeadlineIsWrapSafe)
     clock.now_ms = 0xFFFFFFF0u;    // 16 ms before rollover
     sensor.angle = 5.0f;
     sensor.fresh = true;
+    app.requestArm();
     app.update();                  // accepted; last_fresh_ms_ = 0xFFFFFFF0
     ASSERT_EQ(motor.last_left, 10);
     const int writes_after_fresh = motor.set_calls;
@@ -442,6 +447,7 @@ TEST(AppControlTest, RejectedPollBelowDeadlineRetainsPWM)
     sensor.poll_duration_ms = 5;
     sensor.angle = 5.0f;
     sensor.fresh = true;
+    app.requestArm();
     app.update();                          // last_fresh_ms_ = 5
     ASSERT_EQ(motor.last_left, 10);
     ASSERT_EQ(motor.set_calls, 1);
@@ -565,26 +571,35 @@ TEST(AppControlTest, RecoveryRequiresThreeConsecutiveFresh)
 
     sensor.angle = 5.0f;
     sensor.fresh = true;
+    app.requestArm();
     app.update();
     ASSERT_EQ(motor.last_left, 10);
 
     sensor.fresh = false;
     clock.advance(25);
     app.update();
-    ASSERT_EQ(motor.set_calls, 2);
     ASSERT_EQ(motor.last_left, 0);
 
+    testing::internal::CaptureStdout();
     sensor.fresh = true;
-    app.update();
-    app.update();
+    app.requestArm();
+    app.update();                              // count 1
+    app.requestArm();
+    app.update();                              // count 2
+    const std::string output = testing::internal::GetCapturedStdout();
 
-    EXPECT_EQ(motor.set_calls, 2);             // two fresh is not enough
+    EXPECT_EQ(countOccurrences(output, "ARM REJECTED reason=recovering"), 2);
+    EXPECT_FALSE(app.armed());
     EXPECT_EQ(motor.last_left, 0);
     EXPECT_EQ(motor.last_right, 0);
 
-    app.update();                              // third clears stale
+    testing::internal::CaptureStdout();
+    app.requestArm();
+    app.update();                              // count 3: recovers and arms
+    const std::string armed_out = testing::internal::GetCapturedStdout();
 
-    EXPECT_EQ(motor.set_calls, 3);
+    EXPECT_EQ(countOccurrences(armed_out, "ARMED angle="), 1);
+    EXPECT_TRUE(app.armed());
     EXPECT_EQ(motor.last_left, 10);
     EXPECT_EQ(motor.last_right, 10);
 }
@@ -602,32 +617,41 @@ TEST(AppControlTest, RecoveryCounterResetsOnRejectedPoll)
 
     sensor.angle = 5.0f;
     sensor.fresh = true;
+    app.requestArm();
     app.update();
+    ASSERT_EQ(motor.last_left, 10);
 
     sensor.fresh = false;
     clock.advance(25);
     app.update();
-    ASSERT_EQ(motor.set_calls, 2);
     ASSERT_EQ(motor.last_left, 0);
 
     sensor.fresh = true;
-    app.update();
+    app.update();                              // count 1
     app.update();                              // count 2
 
     sensor.fresh = false;
-    app.update();                              // count back to 0
+    app.update();                              // rejected poll: count back to 0
 
+    testing::internal::CaptureStdout();
     sensor.fresh = true;
+    app.requestArm();
     app.update();                              // count 1, not 3
+    app.requestArm();
+    app.update();                              // count 2
+    const std::string output = testing::internal::GetCapturedStdout();
 
-    EXPECT_EQ(motor.set_calls, 2);
+    EXPECT_EQ(countOccurrences(output, "ARM REJECTED reason=recovering"), 2);
+    EXPECT_FALSE(app.armed());
     EXPECT_EQ(motor.last_left, 0);
 
-    app.update();                              // count 2
-    EXPECT_EQ(motor.set_calls, 2);
+    testing::internal::CaptureStdout();
+    app.requestArm();
+    app.update();                              // count 3: recovers and arms
+    const std::string armed_out = testing::internal::GetCapturedStdout();
 
-    app.update();                              // count 3, recovers
-    EXPECT_EQ(motor.set_calls, 3);
+    EXPECT_EQ(countOccurrences(armed_out, "ARMED angle="), 1);
+    EXPECT_TRUE(app.armed());
     EXPECT_EQ(motor.last_left, 10);
 }
 
@@ -681,34 +705,44 @@ TEST(AppControlTest, RecoveryCounterResetsOnUnsafeAngle)
 
     sensor.angle = 5.0f;
     sensor.fresh = true;
+    app.requestArm();
     app.update();
+    ASSERT_EQ(motor.last_left, 10);
 
     sensor.fresh = false;
     clock.advance(25);
     app.update();
-    ASSERT_EQ(motor.set_calls, 2);
     ASSERT_EQ(motor.last_left, 0);
 
     sensor.fresh = true;
-    app.update();
+    app.update();                              // count 1
     app.update();                              // count 2
 
     sensor.angle = 30.0f;
-    app.update();                              // fresh, but out of band
+    app.update();                              // fresh, out of band: count back to 0
 
+    testing::internal::CaptureStdout();
     sensor.angle = 5.0f;
+    app.requestArm();
     app.update();                              // count 1, not 3
-    EXPECT_EQ(motor.set_calls, 2);
-    EXPECT_EQ(motor.last_left, 0);
-
+    app.requestArm();
     app.update();                              // count 2
-    EXPECT_EQ(motor.set_calls, 2);
+    const std::string output = testing::internal::GetCapturedStdout();
 
-    app.update();                              // count 3, recovers
-    EXPECT_EQ(motor.set_calls, 3);
+    EXPECT_EQ(countOccurrences(output, "ARM REJECTED reason=recovering"), 2);
+    EXPECT_FALSE(app.armed());
+    EXPECT_EQ(motor.last_left, 0);
+    EXPECT_EQ(sensor.encoder_left_reads, 6);   // every fresh sample drains
+
+    testing::internal::CaptureStdout();
+    app.requestArm();
+    app.update();                              // count 3: recovers and arms
+    const std::string armed_out = testing::internal::GetCapturedStdout();
+
+    EXPECT_EQ(countOccurrences(armed_out, "ARMED angle="), 1);
+    EXPECT_TRUE(app.armed());
     EXPECT_EQ(motor.last_left, 10);
-    EXPECT_EQ(sensor.encoder_left_reads, 7);   // every fresh sample drains (gated or not)
-
+    EXPECT_EQ(sensor.encoder_left_reads, 7);
 }
 
 TEST(AppControlTest, RecoveryCounterResetsOnAngleFault)
@@ -724,33 +758,44 @@ TEST(AppControlTest, RecoveryCounterResetsOnAngleFault)
 
     sensor.angle = 5.0f;
     sensor.fresh = true;
+    app.requestArm();
     app.update();
+    ASSERT_EQ(motor.last_left, 10);
 
     sensor.fresh = false;
     clock.advance(25);
     app.update();
-    ASSERT_EQ(motor.set_calls, 2);
     ASSERT_EQ(motor.last_left, 0);
 
     sensor.fresh = true;
-    app.update();
+    app.update();                              // count 1
     app.update();                              // count 2
 
     sensor.angle = 45.0f;
-    app.update();
-    EXPECT_EQ(motor.set_calls, 3);             // faulted, zero PWM
+    app.update();                              // faulted: count back to 0
 
+    testing::internal::CaptureStdout();
     sensor.angle = 5.0f;
-    app.update();                              // RECOVERED, count 1 not 3
-    EXPECT_EQ(motor.set_calls, 3);             // <-- red without the fix
-
+    app.requestArm();
+    app.update();                              // RECOVERED, count 1, not 3
+    app.requestArm();
     app.update();                              // count 2
-    EXPECT_EQ(motor.set_calls, 3);
+    const std::string output = testing::internal::GetCapturedStdout();
 
-    app.update();                              // count 3, recovers
-    EXPECT_EQ(motor.set_calls, 4);
+    EXPECT_EQ(countOccurrences(output, "RECOVERED"), 1);
+    EXPECT_EQ(countOccurrences(output, "ARM REJECTED reason=recovering"), 2);
+    EXPECT_FALSE(app.armed());
+    EXPECT_EQ(motor.last_left, 0);
+
+    testing::internal::CaptureStdout();
+    app.requestArm();
+    app.update();                              // count 3: recovers and arms
+    const std::string armed_out = testing::internal::GetCapturedStdout();
+
+    EXPECT_EQ(countOccurrences(armed_out, "ARMED angle="), 1);
+    EXPECT_TRUE(app.armed());
     EXPECT_EQ(motor.last_left, 10);
-    EXPECT_EQ(sensor.encoder_left_reads, 7);   // no gated sample touched the PI
+    EXPECT_EQ(sensor.encoder_left_reads, 7);   // every fresh sample drains
 }
 
 TEST(AppControlTest, MaxPollDurationIsRecorded)
@@ -1207,30 +1252,40 @@ TEST(AppControlTest, ArmRejectedWhileStaleRecovering)
                    TurnPD(0.0f, 0.0f));
 
     sensor.angle = 5.0f;
+    sensor.fresh = true;
+    app.requestArm();
+    app.update();                              // ARMED
+    ASSERT_EQ(motor.last_left, 10);
 
     sensor.fresh = false;
     clock.advance(25);
     app.update();                              // STALE
+    ASSERT_EQ(motor.last_left, 0);
 
+    sensor.angle = 45.0f;
     sensor.fresh = true;
+    app.update();                              // FAULT during recovery
+
+    sensor.angle = 5.0f;
 
     testing::internal::CaptureStdout();
     app.requestArm();
-    app.update();                              // recovery sample 1
+    app.update();                              // RECOVERED, count 1: rejected
     app.requestArm();
-    app.update();                              // recovery sample 2
-    const std::string gated = testing::internal::GetCapturedStdout();
+    app.update();                              // count 2: rejected
+    const std::string output = testing::internal::GetCapturedStdout();
 
-    EXPECT_EQ(countOccurrences(gated, "ARM REJECTED reason=recovering"), 2);
+    EXPECT_EQ(countOccurrences(output, "RECOVERED"), 1);
+    EXPECT_EQ(countOccurrences(output, "ARM REJECTED reason=recovering"), 2);
     EXPECT_FALSE(app.armed());
     EXPECT_EQ(motor.last_left, 0);
 
     testing::internal::CaptureStdout();
     app.requestArm();
-    app.update();                              // sample 3: stale clears, then the gate accepts
-    const std::string accepted = testing::internal::GetCapturedStdout();
+    app.update();                              // count 3: recovers and arms
+    const std::string armed_out = testing::internal::GetCapturedStdout();
 
-    EXPECT_EQ(countOccurrences("\n" + accepted, "\nARMED angle="), 1);
+    EXPECT_EQ(countOccurrences(armed_out, "ARMED angle="), 1);
     EXPECT_TRUE(app.armed());
     EXPECT_EQ(motor.last_left, 10);
 }
@@ -1431,6 +1486,92 @@ TEST(AppControlTest, ArmingSampleSeesOnlyItsOwnCounts)
     EXPECT_TRUE(app.armed());
     EXPECT_GT(motor.last_left, 0);
     EXPECT_LT(motor.last_left, 100);           // ~32 for one sample; ~1632 with a 5000 backlog
+}
+
+TEST(AppControlTest, ArmRejectedWhileFaulted)
+{
+    MockSensorHal sensor;
+    MockMotorHal motor;
+    MockMonotonicClock clock;
+
+    AppControl app(sensor, motor, clock,
+                   BalancePD(200.0f, 0.0f, 0.0f),
+                   VelocityPI(0.0f, 0.0f, 200.0f),
+                   TurnPD(0.0f, 0.0f));
+
+    sensor.angle = 45.0f;
+    sensor.fresh = true;
+    app.update();                              // FAULT
+
+    testing::internal::CaptureStdout();
+    sensor.angle = 20.0f;                      // > 10 deg hysteresis limit while faulted
+    app.requestArm();
+    app.update();
+    const std::string output = testing::internal::GetCapturedStdout();
+
+    EXPECT_EQ(countOccurrences(output, "ARM REJECTED reason=angle"), 1);
+    EXPECT_FALSE(app.armed());
+    EXPECT_EQ(motor.last_left, 0);
+    EXPECT_EQ(motor.last_right, 0);
+}
+
+TEST(AppControlTest, AngleFaultDisarms)
+{
+    MockSensorHal sensor;
+    MockMotorHal motor;
+    MockMonotonicClock clock;
+
+    AppControl app(sensor, motor, clock,
+                   BalancePD(200.0f, 0.0f, 0.0f),
+                   VelocityPI(0.0f, 0.0f, 200.0f),
+                   TurnPD(0.0f, 0.0f));
+
+    sensor.angle = 5.0f;
+    sensor.fresh = true;
+    app.requestArm();
+    app.update();
+    ASSERT_TRUE(app.armed());
+    ASSERT_EQ(motor.last_left, 10);
+
+    testing::internal::CaptureStdout();
+    sensor.angle = 45.0f;
+    app.update();                              // faulted: disarms
+    const std::string output = testing::internal::GetCapturedStdout();
+
+    EXPECT_EQ(countOccurrences(output, "DISARMED reason=angle"), 1);
+    EXPECT_FALSE(app.armed());
+    EXPECT_EQ(motor.last_left, 0);
+    EXPECT_EQ(motor.last_right, 0);
+}
+
+TEST(AppControlTest, StaleDisarms)
+{
+    MockSensorHal sensor;
+    MockMotorHal motor;
+    MockMonotonicClock clock;
+
+    AppControl app(sensor, motor, clock,
+                   BalancePD(200.0f, 0.0f, 0.0f),
+                   VelocityPI(0.0f, 0.0f, 200.0f),
+                   TurnPD(0.0f, 0.0f));
+
+    sensor.angle = 5.0f;
+    sensor.fresh = true;
+    app.requestArm();
+    app.update();
+    ASSERT_TRUE(app.armed());
+    ASSERT_EQ(motor.last_left, 10);
+
+    testing::internal::CaptureStdout();
+    sensor.fresh = false;
+    clock.advance(25);
+    app.update();                              // deadline: disarms
+    const std::string output = testing::internal::GetCapturedStdout();
+
+    EXPECT_EQ(countOccurrences(output, "DISARMED reason=stale"), 1);
+    EXPECT_FALSE(app.armed());
+    EXPECT_EQ(motor.last_left, 0);
+    EXPECT_EQ(motor.last_right, 0);
 }
 
 
