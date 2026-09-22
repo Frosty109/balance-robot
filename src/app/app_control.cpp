@@ -23,10 +23,45 @@ void AppControl::reset()
 
 void AppControl::requestArm()
 {
+    if (!armed_)
+    {
+        arm_requested_ = true;
+    }
 }
 
 void AppControl::requestDisarm()
 {
+    arm_requested_ = false;
+    disarm("operator");
+}
+
+void AppControl::disarm(const char* reason)
+{
+    motor_.setMotorPWM(0, 0);
+    velocity_.reset();
+
+    if (armed_)
+    {
+        armed_ = false;
+        resetTelemetryWindow();
+        printf("DISARMED reason=%s\n", reason);
+    }
+}
+
+void AppControl::rejectPendingArm(const char* reason)
+{
+    if (arm_requested_)
+    {
+        arm_requested_ = false;
+        printf("ARM REJECTED reason=%s\n", reason);
+    }
+}
+
+void AppControl::resetTelemetryWindow()
+{
+    telemetry_tick_ = 0;
+    enc_l_sum_ = 0;
+    enc_r_sum_ = 0;
 }
 
 void AppControl::update(float move_x, float move_z)
@@ -46,8 +81,9 @@ void AppControl::update(float move_x, float move_z)
         {
             // Motors first: the print busy-waits on the USART for ~3 ms, so reporting
             // before stopping would timestamp a shutdown that has not happened yet.
-            motor_.setMotorPWM(0, 0);
-            velocity_.reset();
+            // stale branch,
+            disarm("stale");
+            rejectPendingArm("stale");
 
             if (!stale_)
             {
@@ -77,8 +113,8 @@ void AppControl::update(float move_x, float move_z)
 
     if (angle < -limit || angle > limit)
     {
-        motor_.setMotorPWM(0, 0);
-        velocity_.reset();
+        disarm("angle");
+        rejectPendingArm("angle");
         consecutive_fresh_ = 0;
 
         if (!faulted_)
@@ -93,6 +129,7 @@ void AppControl::update(float move_x, float move_z)
     {
         faulted_ = false;
         printf("RECOVERED angle=%d\n", (int)(angle * 100));
+        rejectPendingArm("recovering");
     }
 
     if (stale_)
@@ -100,16 +137,50 @@ void AppControl::update(float move_x, float move_z)
         if (angle < -CLEAR_ANGLE || angle > CLEAR_ANGLE)
         {
             consecutive_fresh_ = 0;
+            rejectPendingArm("recovering");
             return;
         }
 
         if (++consecutive_fresh_ < RECOVERY_FRESH_SAMPLES)
         {
+            rejectPendingArm("recovering");
             return;
         }
 
         stale_ = false;
         consecutive_fresh_ = 0;
+    }
+
+    if (arm_requested_)
+    {
+        arm_requested_ = false;
+
+        if (angle < -CLEAR_ANGLE || angle > CLEAR_ANGLE)
+        {
+            printf("ARM REJECTED reason=angle angle=%d\n", (int)(angle * 100));
+        }
+        else
+        {
+            velocity_.reset();
+            resetTelemetryWindow();
+            armed_ = true;
+            printf("ARMED angle=%d\n", (int)(angle * 100));
+        }
+    }
+
+    if (!armed_)
+    {
+        motor_.setMotorPWM(0, 0);
+
+        if (++telemetry_tick_ >= TELEMETRY_DECIMATION)
+        {
+            telemetry_tick_ = 0;
+            printf("state=DISARMED angle=%d battery=%d t=%lu poll=%lu\n",
+                 (int)(angle * 100), int(battery * 100),
+                 (unsigned long)clock_.nowMs(),
+                 (unsigned long)max_poll_ms_);
+        }
+        return;
     }
 
     float gyro      = sensor_.getGyroBalance();

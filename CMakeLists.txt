@@ -38,6 +38,7 @@ add_executable(balance_tests
     tests/test_velocity_pi.cpp
     tests/test_turn_pd.cpp
     tests/test_app_control.cpp
+    tests/test_operator_command.cpp
 )
 
 target_link_libraries(balance_tests PRIVATE GTest::gtest_main)

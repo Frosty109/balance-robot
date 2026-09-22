@@ -25,6 +25,8 @@ int main()
                    VelocityPI(1.2f, 0.05f, 200.0f),
                    TurnPD(5.0f, 0.1f));
 
+    app.requestArm();
+
     for (int i {0}; i < STEPS; ++i)
     {
         physics.update(DT);
