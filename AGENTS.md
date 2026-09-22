@@ -13,14 +13,17 @@ stale-data motor shutdown** (all four gates passed, verified on a clean image 20
 encoder-sign normalisation** (`42ce5c6`); **Stage 6 velocity proportional control** at the reference
 `BalancePD(10200, 78, 0)` / `VelocityPI(7000, 0, 200)`, gate met on restrained hardware 2026-09-09.
 
-**The active milestone is the pre-free-balance safety pair**, promoted out of the deferred table on
-2026-09-12 on hardware evidence:
+**The pre-free-balance safety pair is closed**, both halves verified on restrained hardware:
 
-1. **Intentional launch gate** — an explicit disabled/armed application state. Specified in full,
-   host-test list included, under "Pre-free-balance prerequisite" in
-   `plans/2026-08-16-balance-bring-up.md`. The firmware currently drives whenever the sample is
-   fresh and `|angle| < 40`, so lifting the car disarms nothing: a lift capture showed both motors
-   at full PWM for the entire 8.5 s run with the wheels free.
+1. **Intentional launch gate** — **CLOSED 2026-09-22** in `09009ca` (application state and
+   command decoder) and `ab08218` (serial operator channel). An explicit disarmed/armed application
+   state; the car only drives after an operator `a` byte. Specified under "Pre-free-balance
+   prerequisite" in `plans/2026-08-16-balance-bring-up.md`, built in Phase B of the working plan.
+   Before it, the firmware drove whenever the sample was fresh and `|angle| < 40`, so lifting the
+   car disarmed nothing: a lift capture showed both motors at full PWM for an entire 8.5 s run with
+   the wheels free. Evidence: `devlog/artefacts/2026-09-22-launch-gate-verification.txt` — 11 arm
+   transitions across the session, every one immediately preceded by an operator byte, none
+   spurious, over 12 faults, 8 recoveries and 14 boots.
 2. **Encoder backlog drain on fault/recovery** — **CLOSED 2026-09-18 in `6cad87d`.** The fault and
    stale branches returned before the encoder reads, so one read on recovery delivered the whole
    fault's coast-down and produced a post-recovery command of 43402 against a 2600 clamp. The
@@ -29,13 +32,13 @@ encoder-sign normalisation** (`42ce5c6`); **Stage 6 velocity proportional contro
    Details in follow-up 1 of `plans/2026-09-05-stage5-encoder-signs-velocity.md`.
 
 Original evidence for both: `devlog/artefacts/2026-09-12-stage7-integral-windup-and-fault-recovery.txt`.
-Working plan for the pair: `plans/2026-09-14-pre-free-balance-safety-pair.md` — Phase A done,
-Phase B (the launch gate) next.
+Working plan for the pair: `plans/2026-09-14-pre-free-balance-safety-pair.md` — Phases A, B and C
+done. Phase D (the remaining gate to free balancing) is next.
 
-**Stage 7 (velocity integral) is attempted and blocked** behind those two — its acceptance gate
-needs a freely balancing car and was not assessable under hand-held restraint. Do not resume the
-integral-limit walk without reading the correction in that plan; `Ki` is back to 0, the last
-gate-passing value.
+**Stage 7 (velocity integral) is attempted and blocked** — its acceptance gate needs a freely
+balancing car and was not assessable under hand-held restraint, so it now waits on Stage 3 and
+`mid_angle` rather than on the safety pair. Do not resume the integral-limit walk without reading
+the correction in that plan; `Ki` is back to 0, the last gate-passing value.
 
 ### Free balancing is prohibited
 
@@ -44,10 +47,10 @@ Not until **all** of these are closed:
 | Prerequisite | State |
 |---|---|
 | Stage 2B gates (TIM2 rate, host tests, poll duration, fault injection) | **closed** |
-| Intentional launch gate | **open — active** |
+| Intentional launch gate | **closed** — `09009ca` + `ab08218`, 2026-09-22; B7 rows 1 and 8 not run, see the plan |
 | Encoder backlog drain on fault/recovery | **closed** — `6cad87d`, 2026-09-18 |
-| Stage 3 FIFO/EXTI acquisition decision | open |
-| `mid_angle` trim (Stage 4b) | open; three unreconciled candidates, 0.0f accepted by decision |
+| Stage 3 FIFO/EXTI acquisition decision | **open — active** |
+| `mid_angle` trim (Stage 4b) | **open — active**; three unreconciled candidates, 0.0f accepted by decision |
 
 Also open, on their own triggers rather than this gate: battery cutoff restoration (commented out at
 `src/app/app_control.cpp:60`, needed before unattended running) and the turn sign fix (Stage 9, moot
@@ -58,12 +61,18 @@ Turn control and the battery cutoff remain off.
 
 ### Operating rule on hardware
 
-**Power off before lifting, carrying, repositioning, or touching the wheels.**
+**Disarm and see `DISARMED` before lifting, carrying, repositioning, or touching the wheels.**
 
-Do not tilt the car past the angle-fault threshold as a way of stopping the motors. The fault is not
-a stop: returning inside ±10° re-arms automatically and drives on that same sample. The backlog
-kick is gone, but a car held in the air after recovery still runs straight back to full PWM. This
-rule stands until the launch gate exists.
+Send a disarm byte — a space, or any byte that is not `a` — and read the `DISARMED reason=operator`
+line back before your hands go near the wheels. Verified 2026-09-22: a fault now disarms for good,
+recovery prints `RECOVERED` and does not drive, and only an explicit `a` starts the motors again.
+
+Power off remains the fallback, and the only stop that does not depend on the serial link. The link
+is not a dead-man switch: if the terminal stops responding while the car is armed, cut power rather
+than approaching it.
+
+A past-40° tilt is now a real stop rather than a pause, but it is a worse one than a keystroke —
+it ends with the car at an angle in your hands. Use the disarm byte.
 
 ## Working agreement
 
