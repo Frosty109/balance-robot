@@ -35,8 +35,8 @@ add_executable(firmware.elf
     # CMSIS system + startup assembly.
     # core_cm3.c is deliberately NOT compiled: it's a CMSIS-1.x relic whose out-of-line
     # GCC __STREXB/__STREXH inline asm is rejected by modern binutils (strex needs distinct
-    # registers). Nothing references those exclusive-access intrinsics, and the core helpers
-    # that ARE used are static-inline in core_cm3.h — so the .c is pure dead weight here.
+    # registers). Its GCC-branch __get/__set_PRIMASK are likewise out-of-line externs;
+    # bsp/usart avoids them with local inline asm, so the .c stays dead weight.
     CMSIS/system_stm32f10x.c
     CMSIS/startup_stm32f10x_hd_gcc.s
 

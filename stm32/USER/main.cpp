@@ -69,9 +69,26 @@ int main()
                    VelocityPI(7000.0f, 0.0f, 200.0f),
                    TurnPD(0.0f, 0.0f));
 
+    app.requestDisarm();
+    printf("DISARMED reason=boot\n");
+    usart.enableOperatorCommands();
+
     while (true)
     {
+        const OperatorCommands cmd = usart.takeCommands();
+
+        switch (resolveOperatorCommands(cmd.arm, cmd.disarm))
+        {
+            case OperatorCommand::Arm:
+                app.requestArm();
+                break;
+            case OperatorCommand::Disarm:
+                app.requestDisarm();
+                break;
+            case OperatorCommand::None:
+                break;
+        }
+
         app.update();
-        // delay_ms(5);
     }
 }
