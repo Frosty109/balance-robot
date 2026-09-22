@@ -2,12 +2,36 @@
 
 #include "usart.hpp"
 
+#include "../../src/app/operator_command.hpp"
+
 extern "C" {
     #include "stm32f10x.h"
     #include "stm32f10x_gpio.h"
     #include "stm32f10x_usart.h"
     #include "stm32f10x_rcc.h"
     #include "misc.h"
+}
+
+namespace {
+    volatile bool rx_arm_;
+    volatile bool rx_disarm_;
+
+    constexpr uint16_t RECEIVE_ERRORS = USART_FLAG_ORE | USART_FLAG_FE |
+                                        USART_FLAG_NE | USART_FLAG_PE;
+
+    // __get/__set_PRIMASK live in core_cm3.c, which is excluded from the build.
+    inline uint32_t primaskSave()
+    {
+        uint32_t primask;
+        __ASM volatile ("MRS %0, primask" : "=r" (primask));
+        __disable_irq();
+        return primask;
+    }
+
+    inline void primaskRestore(uint32_t primask)
+    {
+        __ASM volatile ("MSR primask, %0" : : "r" (primask));
+    }
 }
 
 Usart::Usart(UsartConfig config)
@@ -86,12 +110,46 @@ extern "C" int _write(int fd, char* buf, int len)
 }
 #endif
 
+void Usart::enableOperatorCommands()
+{
+    // Purge bytes received during initialization so none can arm on the first loop.
+    const uint32_t primask = primaskSave();
+
+    rx_arm_    = false;
+    rx_disarm_ = false;
+
+    if ((cfg_.usart->SR & USART_FLAG_RXNE) != 0)
+    {
+        (void)cfg_.usart->DR;
+    }
+    NVIC_ClearPendingIRQ(static_cast<IRQn_Type>(cfg_.nvic_channel));
+    USART_ITConfig(cfg_.usart, USART_IT_RXNE, ENABLE);
+
+    primaskRestore(primask);
+}
+
+OperatorCommands Usart::takeCommands()
+{
+    const uint32_t primask = primaskSave();
+
+    const OperatorCommands cmd { rx_arm_, rx_disarm_ };
+
+    rx_arm_    = false;
+    rx_disarm_ = false;
+
+    primaskRestore(primask);
+    return cmd;
+}
+
 extern "C" void USART1_IRQHandler(void)
 {
-    if (USART_GetITStatus(USART1, USART_IT_RXNE) != RESET)
-    {
-        uint8_t byte { (uint8_t)USART_ReceiveData(USART1) };
-        USART_SendData(USART1, byte);
-    }
+    // F103 clears ORE/FE/NE/PE as part of the status-then-data read, so SR must be captured before draining DR.
+    const uint16_t sr   { USART1->SR };
+    const uint8_t  byte { (uint8_t)USART_ReceiveData(USART1) };
+
+    const OperatorCommand cmd = decodeOperatorByte(byte,
+                                                   (sr & RECEIVE_ERRORS) != 0);
+    if (cmd == OperatorCommand::Arm)    { rx_arm_    = true; }
+    if (cmd == OperatorCommand::Disarm) { rx_disarm_ = true; }
 }
 
