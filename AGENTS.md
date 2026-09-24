@@ -11,11 +11,13 @@ The current phase is hardware safety work, not tuning.
 an `IMonotonicClock` seam (`1bd5bb4`), tick rate measured at 1.001 rather than assumed; **Stage 2B
 stale-data motor shutdown** (all four gates passed, verified on a clean image 2026-09-05); **Stage 5
 encoder-sign normalisation** (`42ce5c6`); **Stage 6 velocity proportional control** at the reference
-`BalancePD(10200, 78, 0)` / `VelocityPI(7000, 0, 200)`, gate met on restrained hardware 2026-09-09.
+`BalancePD(10200, 78, 0)` / `VelocityPI(7000, 0, 200)`, gate met on restrained hardware 2026-09-09;
+**Stage 7 velocity integral control** at `VelocityPI(7000, 35, 200)` (`7aa0053`), accepted on a
+freely balancing car 2026-09-24.
 
 **The car balances freely.** Recorded 2026-09-22 on the operator's report: pressing `a` stands it
-up and it holds. It has been doing so for some time — **the first free-standing run is not dated in
-the project record and no telemetry capture of one exists.** That gap is the top item below.
+up and it holds. It has been doing so for some time; the first free-standing run remains undated,
+but free-balance and push-recovery telemetry was captured and accepted on 2026-09-24.
 
 **The pre-free-balance safety pair is closed**, both halves verified on restrained hardware:
 
@@ -40,12 +42,18 @@ Working plan for the pair: `plans/2026-09-14-pre-free-balance-safety-pair.md` �
 done. **The active plan is now `plans/2026-09-22-phase-d-to-first-free-balance.md`**, which breaks
 Phase D into steps with acceptance gates and is written to be actionable without prior context.
 
-**Stage 7 (velocity integral) is the active task, and is no longer blocked.** It was halted on
-2026-09-12 for one stated reason — its gate needs a freely balancing car and was not assessable
-under hand-held restraint. That car now exists, so the blocker is gone, and the integral is the
-control term that addresses the steady lean described above. Do not resume the integral-limit walk
-without reading the correction in follow-up 2 of
-`plans/2026-09-05-stage5-encoder-signs-velocity.md`; `Ki` is back to 0, the last gate-passing value.
+**Stage 7 (velocity integral) is closed.** On 2026-09-24 the operator changed only `Ki`, from 0 to
+the Yahboom reference value 35, while retaining the conservative integral limit of 200. On the
+freely balancing car the integral left the clamp, wheel speed returned to zero after disturbances,
+and the car showed no runaway or growing oscillation. The accepted capture spans 21.74 s and 218
+telemetry rows: angle -8.39° to +8.42°, peak absolute motor command 1040, `poll` at 3–4 ms, and
+39/218 rows at the integral clamp. Evidence:
+`devlog/artefacts/2026-09-24-stage7-ki35-limit200-verification.txt`.
+
+**Stage 4b (`mid_angle`) is now the active task.** Use the freely balancing evidence rather than a
+passive resting angle. The 2026-09-24 captures contain several stationary equilibria, so do not
+select one telemetry window by convenience; follow the two-direction measurement method in Phase
+D2 of `plans/2026-09-22-phase-d-to-first-free-balance.md`.
 
 ### Free balancing — achieved, and what that changed
 
@@ -73,14 +81,13 @@ did not block it. They still matter, for different reasons than originally claim
 | B7 rows 1 and 8 | the startup purge is verified nowhere — not by any host test |
 | Turn sign fix (Stage 9) | moot while `TurnPD(0,0)` |
 
-**The observed symptom, and what it means.** The car sits with a slight backward lean. There is
-**no integrator anywhere in the control path** — `BalancePD` is PD only, and `VelocityPI` runs at
-`Ki = 0` — so a constant disturbance necessarily produces a constant steady-state error. A cable
-tug and a centre-of-mass offset are indistinguishable from the lean alone. `enc_l`/`enc_r` in the
-armed telemetry discriminate: sums near zero with a steady non-zero `angle=` means it is holding a
-lean and staying put; consistently negative sums mean it is creeping. The steady `angle=` value is
-itself a `mid_angle` candidate measured on a freely balancing car, which is better evidence than
-the three hand measurements on record.
+**The observed symptom, and what it means.** Before Stage 7 the car tended to move backwards, with
+the velocity integral state pinned at +200 when tested at a deliberately weak `Ki=4`. At `Ki=35`
+the state repeatedly left the clamp and the car returned to stationary balance after disturbances.
+It still settles at non-zero angles, so cable tug, centre-of-mass offset and `mid_angle` error remain
+indistinguishable from lean alone. `enc_l`/`enc_r` discriminate a stationary lean from creep. The
+stationary angles are useful D2 evidence, but the captures contain multiple equilibria rather than
+one value that can be copied directly into `mid_angle`.
 
 Turn control and the battery cutoff remain off.
 
