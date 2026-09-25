@@ -13,7 +13,7 @@ public:
     float getRoll()  const;
     float getYaw()   const;
     short getGyroX() const;
-    short getGyroZ() const;
+    float getYawRateDps() const;
 
     float getAccelZ() const;
 
@@ -28,6 +28,7 @@ private:
     static constexpr uint8_t    DEV_ADDR {0x68};
     static constexpr uint8_t    WHO_AM_I_REG {0x75};
     static constexpr uint8_t    WHO_AM_I_VAL {0x68};
+    static constexpr float      GYRO_COUNTS_PER_DPS {16.4f}; // ±2000 dps full scale, set in mpu_init()
 
     static const signed char GYRO_ORIENTATION[9];
     static unsigned short inv_row_2_scale(const signed char* row);

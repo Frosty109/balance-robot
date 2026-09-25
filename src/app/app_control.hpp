@@ -15,9 +15,9 @@ public:
                IMonotonicClock& clock,
                BalancePD balance,
                VelocityPI velocity,
-               TurnPD turn);
+               YawRateP turn);
 
-    void update(float move_x = 0.0f, float move_z = 0.0f);
+    void update(float move_x = 0.0f, float target_yaw_rate_dps = 0.0f);
     void reset();
 
     void requestArm();
@@ -30,7 +30,7 @@ private:
     IMonotonicClock& clock_;
     BalancePD   balance_;
     VelocityPI  velocity_;
-    TurnPD      turn_;
+    YawRateP      turn_;
 
     bool          faulted_ {false};
     int           telemetry_tick_ {0};
