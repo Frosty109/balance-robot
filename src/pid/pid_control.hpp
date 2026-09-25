@@ -23,16 +23,6 @@ class VelocityPI
         float encoder_bias_, encoder_integral_;
 };
 
-class TurnPD
-{
-    public: 
-        TurnPD(float kp, float kd);
-        int compute(float gyro_z, float move_z = 0.0f);
-
-    private:
-        float kp_, kd_;
-};
-
 class YawRateP
 {
     public: 

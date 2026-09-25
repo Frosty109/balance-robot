@@ -1,4 +1,5 @@
 #include "pid_control.hpp"
+#include <algorithm>
 
 // BalancePD
 BalancePD::BalancePD(float kp, float kd, float mid_angle)
@@ -46,16 +47,6 @@ void VelocityPI::reset()
     encoder_bias_ = 0.0f;
 }
 
-TurnPD::TurnPD(float kp, float kd)
-    : kp_(kp), kd_(kd)
-{
-}
-
-int TurnPD::compute(float gyro_z, float move_z)
-{
-    return 0 * kp_ / 100.0f + gyro_z * kd_ / 100.0f + move_z;
-}
-
 YawRateP::YawRateP(float kp_pwm_per_dps, float max_target_dps, int max_effort)
     : kp_pwm_per_dps_(kp_pwm_per_dps), max_target_dps_(max_target_dps), max_effort_(max_effort)
 {   
@@ -63,6 +54,10 @@ YawRateP::YawRateP(float kp_pwm_per_dps, float max_target_dps, int max_effort)
 
 int YawRateP::compute(float target_yaw_rate_dps, float measured_yaw_rate_dps) const
 {
-    return 0;
+    const float target = std::clamp(target_yaw_rate_dps, -max_target_dps_, max_target_dps_);
+    const float error = target - measured_yaw_rate_dps;
+
+    const int requested = static_cast<int>(kp_pwm_per_dps_ * error);
+    return std::clamp(requested, -max_effort_, max_effort_);
 }
 
