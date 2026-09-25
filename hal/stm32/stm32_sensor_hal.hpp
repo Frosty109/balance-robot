@@ -16,7 +16,7 @@ public:
 
     float getAngle()        override;
     float getGyroBalance()  override;
-    float getGyroTurn()     override;
+    float getYawRateDps()     override;
     float getAccelZ()       override;
     float getBattery()      override;
     int   getEncoderLeft()  override;

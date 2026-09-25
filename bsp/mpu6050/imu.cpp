@@ -110,11 +110,11 @@ bool Imu::read()
     return true;
 }
 
-float Imu::getPitch() const { return pitch_; }
-float Imu::getRoll()  const { return roll_;  }
-float Imu::getYaw()   const { return yaw_;   }
-short Imu::getGyroX() const { return gyro_[0]; }
-short Imu::getGyroZ() const { return gyro_[2]; }
+float Imu::getPitch()       const { return pitch_; }
+float Imu::getRoll()        const { return roll_;  }
+float Imu::getYaw()         const { return yaw_;   }
+short Imu::getGyroX()       const { return gyro_[0]; }
+float Imu::getYawRateDps()  const { return gyro_[2] / GYRO_COUNTS_PER_DPS; }
 
 float Imu::getAccelZ() const { return accel_[2]; }
 

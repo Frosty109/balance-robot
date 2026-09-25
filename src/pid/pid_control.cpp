@@ -56,3 +56,13 @@ int TurnPD::compute(float gyro_z, float move_z)
     return 0 * kp_ / 100.0f + gyro_z * kd_ / 100.0f + move_z;
 }
 
+YawRateP::YawRateP(float kp_pwm_per_dps, float max_target_dps, int max_effort)
+    : kp_pwm_per_dps_(kp_pwm_per_dps), max_target_dps_(max_target_dps), max_effort_(max_effort)
+{   
+}
+
+int YawRateP::compute(float target_yaw_rate_dps, float measured_yaw_rate_dps) const
+{
+    return 0;
+}
+

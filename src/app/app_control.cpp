@@ -6,7 +6,7 @@ AppControl::AppControl(ISensorHal& sensor,
                        IMonotonicClock& clock,
                        BalancePD balance,
                        VelocityPI velocity,
-                       TurnPD turn)
+                       YawRateP turn)
     : sensor_(sensor),
       motor_(motor),
       clock_(clock),
@@ -64,7 +64,7 @@ void AppControl::resetTelemetryWindow()
     enc_r_sum_ = 0;
 }
 
-void AppControl::update(float move_x, float move_z)
+void AppControl::update(float move_x, float target_yaw_rate_dps)
 {
     const std::uint32_t before = clock_.nowMs();
     const bool fresh = sensor_.poll();
@@ -175,8 +175,10 @@ void AppControl::update(float move_x, float move_z)
         if (++telemetry_tick_ >= TELEMETRY_DECIMATION)
         {
             telemetry_tick_ = 0;
-            printf("state=DISARMED angle=%d battery=%d t=%lu poll=%lu\n",
-                 (int)(angle * 100), int(battery * 100),
+            printf("state=DISARMED angle=%d gz=%d battery=%d t=%lu poll=%lu\n",
+                 (int)(angle * 100), 
+                 (int)(sensor_.getYawRateDps() * 10),
+                 (int)(battery * 100),
                  (unsigned long)clock_.nowMs(),
                  (unsigned long)max_poll_ms_);
         }
@@ -184,14 +186,14 @@ void AppControl::update(float move_x, float move_z)
     }
 
     float gyro      = sensor_.getGyroBalance();
-    float gyro_z    = sensor_.getGyroTurn();
+    float yaw_rate_dps    = sensor_.getYawRateDps();
 
     enc_l_sum_ += enc_l;
     enc_r_sum_ += enc_r;
 
     int balance  = balance_.compute(angle, gyro);
     int velocity = velocity_.compute(enc_l, enc_r, move_x);
-    int turn     = turn_.compute(gyro_z, move_z);
+    int turn     = turn_.compute(target_yaw_rate_dps, yaw_rate_dps);
 
     int left = balance + velocity - turn;
     int right = balance + velocity + turn;

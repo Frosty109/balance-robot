@@ -24,13 +24,13 @@ public:
 class MockSensorHal : public ISensorHal
 {
 public:
-    float angle     {0.0f};
-    float battery   {12.0f};
-    float gyro      {0.0f};
-    float gyro_z    {0.0f};
-    int   enc_l     {0};
-    int   enc_r     {0};
-    int   poll_calls {0};
+    float angle         {0.0f};
+    float battery       {12.0f};
+    float gyro          {0.0f};
+    float yaw_rate_dps  {0.0f};
+    int   enc_l         {0};
+    int   enc_r         {0};
+    int   poll_calls    {0};
     int   encoder_left_reads {0};
     int   encoder_right_reads {0};
     bool  fresh     {true};
@@ -48,9 +48,9 @@ public:
     float getAngle()        override { return angle; }
     float getBattery()      override { return battery; }
     float getGyroBalance()  override { return gyro; }
-    float getGyroTurn()     override { return gyro_z; }
+    float getYawRateDps()   override { return yaw_rate_dps; }
     float getAccelZ()       override { return 0.0f; }
-    int   getEncoderLeft() override
+    int   getEncoderLeft()  override
     {
         ++encoder_left_reads;
         if (accumulate_encoders)
@@ -128,7 +128,7 @@ TEST(AppControlTest, SafetyCutoffOnHighAngle)
                      clock,
                      BalancePD(200.0f, 0.8f, 0.0f),
                      VelocityPI(1.2f, 0.05f, 200.0f),
-                     TurnPD(5.0f, 0.1f));
+                     YawRateP(0.0f, 30.0f, 100));
 
     sensor.angle    = 45.0f;
     sensor.battery  = 12.0f;
@@ -149,7 +149,7 @@ TEST(AppControlTest, SafetyCutoffOnLowBattery)
                      clock,
                      BalancePD(200.0f, 0.8f, 0.0f),
                      VelocityPI(1.2f, 0.05f, 200.0f),
-                     TurnPD(5.0f, 0.1f));
+                     YawRateP(0.0f, 30.0f, 100));
 
     sensor.angle    = 0.0f;
     sensor.battery  = 9.0f;
@@ -170,7 +170,7 @@ TEST(AppControlTest, NormalPathDrivesMotors)
                      clock,
                      BalancePD(200.0f, 0.8f, 0.0f),
                      VelocityPI(1.2f, 0.05f, 200.0f),
-                     TurnPD(5.0f, 0.1f));
+                     YawRateP(0.0f, 30.0f, 100));
 
     sensor.angle    = 5.0f;
     sensor.battery  = 12.0f;
@@ -193,7 +193,7 @@ TEST(AppControlTest, FreshSamplePerformsOneControlUpdate)
         clock,
         BalancePD(200.0f, 0.0f, 0.0f),
         VelocityPI(0.0f, 0.0f, 200.0f),
-        TurnPD(0.0f, 0.0f));
+        YawRateP(0.0f, 30.0f, 100));
 
     sensor.fresh = true;
     sensor.angle = 5.0f;
@@ -222,7 +222,7 @@ TEST(AppControlTest, NotFreshSampleDoesNotUpdateControl)
         clock,
         BalancePD(200.0f, 0.0f, 0.0f),
         VelocityPI(0.0f, 0.0f, 200.0f),
-        TurnPD(0.0f, 0.0f));
+        YawRateP(0.0f, 30.0f, 100));
 
     sensor.fresh = true;
     sensor.angle = 5.0f;
@@ -268,7 +268,7 @@ TEST(AppControlTest, NotFreshSampleDoesNotAdvanceVelocityState)
         tested_clock,
         BalancePD(0.0f, 0.0f, 0.0f),
         VelocityPI(100.0f, 100.0f, 10000.0f),
-        TurnPD(0.0f, 0.0f));
+        YawRateP(0.0f, 30.0f, 100));
 
     AppControl reference_app(
         reference_sensor,
@@ -276,7 +276,7 @@ TEST(AppControlTest, NotFreshSampleDoesNotAdvanceVelocityState)
         reference_clock,
         BalancePD(0.0f, 0.0f, 0.0f),
         VelocityPI(100.0f, 100.0f, 10000.0f),
-        TurnPD(0.0f, 0.0f));
+        YawRateP(0.0f, 30.0f, 100));
 
     tested_sensor.enc_l = 100;
     tested_sensor.enc_r = 100;
@@ -321,7 +321,7 @@ TEST(AppControlTest, TelemetryDecimationCountsFreshSamples)
         clock,
         BalancePD(0.0f, 0.0f, 0.0f),
         VelocityPI(0.0f, 0.0f, 200.0f),
-        TurnPD(0.0f, 0.0f));
+        YawRateP(0.0f, 30.0f, 100));
 
     testing::internal::CaptureStdout();
 
@@ -368,7 +368,7 @@ TEST(AppControlTest, TelemetrySumsEncoderCountsAcrossTheWindow)
         clock,
         BalancePD(0.0f, 0.0f, 0.0f),
         VelocityPI(0.0f, 0.0f, 200.0f),
-        TurnPD(0.0f, 0.0f));
+        YawRateP(0.0f, 30.0f, 100));
         
     // 3 and -5 are chosen so the four plausible mistakes fail differently
     sensor.enc_l = 3;
@@ -410,7 +410,7 @@ TEST(AppControlTest, StaleDeadlineIsWrapSafe)
     AppControl app(sensor, motor, clock,
                    BalancePD(200.0f, 0.0f, 0.0f),
                    VelocityPI(0.0f, 0.0f, 200.0f),
-                   TurnPD(0.0f, 0.0f));
+                   YawRateP(0.0f, 30.0f, 100));
 
     clock.now_ms = 0xFFFFFFF0u;    // 16 ms before rollover
     sensor.angle = 5.0f;
@@ -441,7 +441,7 @@ TEST(AppControlTest, RejectedPollBelowDeadlineRetainsPWM)
     AppControl app(sensor, motor, clock,
                    BalancePD(200.0f, 0.0f, 0.0f),
                    VelocityPI(0.0f, 0.0f, 200.0f),
-                   TurnPD(0.0f, 0.0f));
+                   YawRateP(0.0f, 30.0f, 100));
 
     sensor.clock = &clock;
     sensor.poll_duration_ms = 5;
@@ -473,7 +473,7 @@ TEST(AppControlTest, ShutdownAtExactDeadline)
     AppControl app(sensor, motor, clock,
                    BalancePD(200.0f, 0.0f, 0.0f),
                    VelocityPI(0.0f, 0.0f, 200.0f),
-                   TurnPD(0.0f, 0.0f));
+                   YawRateP(0.0f, 30.0f, 100));
 
     sensor.angle = 5.0f;
     sensor.fresh = true;
@@ -505,7 +505,7 @@ TEST(AppControlTest, StaleResetsVelocityState)
         tested_clock,
         BalancePD(0.0f, 0.0f, 0.0f),
         VelocityPI(100.0f, 100.0f, 10000.0f),
-        TurnPD(0.0f, 0.0f));
+        YawRateP(0.0f, 30.0f, 100));
 
     AppControl reference_app(
         reference_sensor,
@@ -513,7 +513,7 @@ TEST(AppControlTest, StaleResetsVelocityState)
         reference_clock,
         BalancePD(0.0f, 0.0f, 0.0f),
         VelocityPI(100.0f, 100.0f, 10000.0f),
-        TurnPD(0.0f, 0.0f));
+        YawRateP(0.0f, 30.0f, 100));
 
     tested_sensor.enc_l = 100;
     tested_sensor.enc_r = 100;
@@ -567,7 +567,7 @@ TEST(AppControlTest, RecoveryRequiresThreeConsecutiveFresh)
     AppControl app(sensor, motor, clock,
                    BalancePD(200.0f, 0.0f, 0.0f),
                    VelocityPI(0.0f, 0.0f, 200.0f),
-                   TurnPD(0.0f, 0.0f));
+                   YawRateP(0.0f, 30.0f, 100));
 
     sensor.angle = 5.0f;
     sensor.fresh = true;
@@ -613,7 +613,7 @@ TEST(AppControlTest, RecoveryCounterResetsOnRejectedPoll)
     AppControl app(sensor, motor, clock,
                    BalancePD(200.0f, 0.0f, 0.0f),
                    VelocityPI(0.0f, 0.0f, 200.0f),
-                   TurnPD(0.0f, 0.0f));
+                   YawRateP(0.0f, 30.0f, 100));
 
     sensor.angle = 5.0f;
     sensor.fresh = true;
@@ -664,7 +664,7 @@ TEST(AppControlTest, RecoveryRejectedWhenAngleUnsafe)
     AppControl app(sensor, motor, clock,
                    BalancePD(200.0f, 0.0f, 0.0f),
                    VelocityPI(0.0f, 0.0f, 200.0f),
-                   TurnPD(0.0f, 0.0f));
+                   YawRateP(0.0f, 30.0f, 100));
 
     sensor.angle = 5.0f;
     sensor.fresh = true;
@@ -701,7 +701,7 @@ TEST(AppControlTest, RecoveryCounterResetsOnUnsafeAngle)
     AppControl app(sensor, motor, clock,
                    BalancePD(200.0f, 0.0f, 0.0f),
                    VelocityPI(0.0f, 0.0f, 200.0f),
-                   TurnPD(0.0f, 0.0f));
+                   YawRateP(0.0f, 30.0f, 100));
 
     sensor.angle = 5.0f;
     sensor.fresh = true;
@@ -754,7 +754,7 @@ TEST(AppControlTest, RecoveryCounterResetsOnAngleFault)
     AppControl app(sensor, motor, clock,
                    BalancePD(200.0f, 0.0f, 0.0f),
                    VelocityPI(0.0f, 0.0f, 200.0f),
-                   TurnPD(0.0f, 0.0f));
+                   YawRateP(0.0f, 30.0f, 100));
 
     sensor.angle = 5.0f;
     sensor.fresh = true;
@@ -807,7 +807,7 @@ TEST(AppControlTest, MaxPollDurationIsRecorded)
     AppControl app(sensor, motor, clock,
                    BalancePD(200.0f, 0.0f, 0.0f),
                    VelocityPI(0.0f, 0.0f, 200.0f),
-                   TurnPD(0.0f, 0.0f));
+                   YawRateP(0.0f, 30.0f, 100));
 
     sensor.clock = &clock;
     sensor.angle = 5.0f;
@@ -839,7 +839,7 @@ TEST(AppControlTest, StaleEntryPrintsOnce)
     AppControl app(sensor, motor, clock,
                    BalancePD(200.0f, 0.0f, 0.0f),
                    VelocityPI(0.0f, 0.0f, 200.0f),
-                   TurnPD(0.0f, 0.0f));
+                   YawRateP(0.0f, 30.0f, 100));
 
     sensor.angle = 5.0f;
     sensor.fresh = true;
@@ -881,7 +881,7 @@ TEST(AppControlTest, AngleFaultBacklogIsDiscardedOnRecovery)
     AppControl app(sensor, motor, clock,
                    BalancePD(0.0f, 0.0f, 0.0f),
                    VelocityPI(100.0f, 0.0f, 100000.0f),
-                   TurnPD(0.0f, 0.0f));
+                   YawRateP(0.0f, 30.0f, 100));
 
     sensor.accumulate_encoders = true;
     sensor.angle = 5.0f;
@@ -922,7 +922,7 @@ TEST(AppControlTest, StaleBacklogIsDiscardedOnRecovery)
     AppControl app(sensor, motor, clock,
                    BalancePD(0.0f, 0.0f, 0.0f),
                    VelocityPI(100.0f, 0.0f, 100000.0f),
-                   TurnPD(0.0f, 0.0f));
+                   YawRateP(0.0f, 30.0f, 100));
 
     sensor.accumulate_encoders = true;
     sensor.angle = 5.0f;
@@ -968,7 +968,7 @@ TEST(AppControlTest, ArmRejectedOutsideClearBand)
     AppControl app(sensor, motor, clock,
                    BalancePD(200.0f, 0.0f, 0.0f),
                    VelocityPI(0.0f, 0.0f, 200.0f),
-                   TurnPD(0.0f, 0.0f));
+                   YawRateP(0.0f, 30.0f, 100));
 
     sensor.angle = 20.0f;                      // inside the 40° fault, outside the 10° clear band
 
@@ -989,7 +989,7 @@ TEST(AppControlTest, ArmRequestIsNotLatched)
     AppControl app(sensor, motor, clock,
                    BalancePD(200.0f, 0.0f, 0.0f),
                    VelocityPI(0.0f, 0.0f, 200.0f),
-                   TurnPD(0.0f, 0.0f));
+                   YawRateP(0.0f, 30.0f, 100));
 
     sensor.angle = 20.0f;
 
@@ -1017,7 +1017,7 @@ TEST(AppControlTest, ArmAcceptedOnFreshInBandSample)
     AppControl app(sensor, motor, clock,
                    BalancePD(200.0f, 0.0f, 0.0f),
                    VelocityPI(0.0f, 0.0f, 200.0f),
-                   TurnPD(0.0f, 0.0f));
+                   YawRateP(0.0f, 30.0f, 100));
 
     sensor.angle = 5.0f;
 
@@ -1038,7 +1038,7 @@ TEST(AppControlTest, NoRestartAfterAngleRecovery)
     AppControl app(sensor, motor, clock,
                    BalancePD(200.0f, 0.0f, 0.0f),
                    VelocityPI(0.0f, 0.0f, 200.0f),
-                   TurnPD(0.0f, 0.0f));
+                   YawRateP(0.0f, 30.0f, 100));
 
     sensor.angle = 5.0f;
     app.requestArm();
@@ -1071,7 +1071,7 @@ TEST(AppControlTest, NoRestartAfterStaleRecovery)
     AppControl app(sensor, motor, clock,
                    BalancePD(200.0f, 0.0f, 0.0f),
                    VelocityPI(0.0f, 0.0f, 200.0f),
-                   TurnPD(0.0f, 0.0f));
+                   YawRateP(0.0f, 30.0f, 100));
 
     sensor.angle = 5.0f;
     app.requestArm();
@@ -1110,7 +1110,7 @@ TEST(AppControlTest, DisarmedTelemetryReportsState)
     AppControl app(sensor, motor, clock,
                    BalancePD(200.0f, 0.0f, 0.0f),
                    VelocityPI(0.0f, 0.0f, 200.0f),
-                   TurnPD(0.0f, 0.0f));
+                   YawRateP(0.0f, 30.0f, 100));
 
     sensor.angle = 5.0f;                       // upright, but never armed
 
@@ -1135,7 +1135,7 @@ TEST(AppControlTest, RearmStartsAFullTelemetryWindow)
     AppControl app(sensor, motor, clock,
                    BalancePD(200.0f, 0.0f, 0.0f),
                    VelocityPI(0.0f, 0.0f, 200.0f),
-                   TurnPD(0.0f, 0.0f));
+                   YawRateP(0.0f, 30.0f, 100));
 
     sensor.angle = 5.0f;
     sensor.enc_l = 3; // first-window counts, distinct from the second
@@ -1184,7 +1184,7 @@ TEST(AppControlTest, TransitionsPrintOnce)
     AppControl app(sensor, motor, clock,
                    BalancePD(200.0f, 0.0f, 0.0f),
                    VelocityPI(0.0f, 0.0f, 200.0f),
-                   TurnPD(0.0f, 0.0f));
+                   YawRateP(0.0f, 30.0f, 100));
 
     sensor.angle = 5.0f;
     app.requestArm();
@@ -1214,7 +1214,7 @@ TEST(AppControlTest, ArmRejectedOnAngleRecoverySample)
     AppControl app(sensor, motor, clock,
                    BalancePD(200.0f, 0.0f, 0.0f),
                    VelocityPI(0.0f, 0.0f, 200.0f),
-                   TurnPD(0.0f, 0.0f));
+                   YawRateP(0.0f, 30.0f, 100));
 
     sensor.angle = 45.0f;
     app.update();                              // FAULT
@@ -1249,7 +1249,7 @@ TEST(AppControlTest, ArmRejectedWhileStaleRecovering)
     AppControl app(sensor, motor, clock,
                    BalancePD(200.0f, 0.0f, 0.0f),
                    VelocityPI(0.0f, 0.0f, 200.0f),
-                   TurnPD(0.0f, 0.0f));
+                   YawRateP(0.0f, 30.0f, 100));
 
     sensor.angle = 5.0f;
     sensor.fresh = true;
@@ -1299,7 +1299,7 @@ TEST(AppControlTest, BootsDisarmedAndCommandsZero)
     AppControl app(sensor, motor, clock,
                    BalancePD(200.0f, 0.0f, 0.0f),
                    VelocityPI(0.0f, 0.0f, 200.0f),
-                   TurnPD(0.0f, 0.0f));
+                   YawRateP(0.0f, 30.0f, 100));
 
     motor.last_left = 999;                     // whatever the outputs held before main ran
     motor.last_right = 999;
@@ -1329,7 +1329,7 @@ TEST(AppControlTest, DisarmCommandsZeroImmediately)
     AppControl app(sensor, motor, clock,
                    BalancePD(200.0f, 0.0f, 0.0f),
                    VelocityPI(0.0f, 0.0f, 200.0f),
-                   TurnPD(0.0f, 0.0f));
+                   YawRateP(0.0f, 30.0f, 100));
 
     sensor.angle = 5.0f;
     app.requestArm();
@@ -1363,12 +1363,12 @@ TEST(AppControlTest, DisarmResetsVelocityState)
     AppControl tested_app(tested_sensor, tested_motor, tested_clock,
                           BalancePD(0.0f, 0.0f, 0.0f),
                           VelocityPI(100.0f, 100.0f, 10000.0f),
-                          TurnPD(0.0f, 0.0f));
+                          YawRateP(0.0f, 30.0f, 100));
 
     AppControl reference_app(reference_sensor, reference_motor, reference_clock,
                              BalancePD(0.0f, 0.0f, 0.0f),
                              VelocityPI(100.0f, 100.0f, 10000.0f),
-                             TurnPD(0.0f, 0.0f));
+                             YawRateP(0.0f, 30.0f, 100));
 
     tested_sensor.enc_l = 100;
     tested_sensor.enc_r = 100;
@@ -1419,12 +1419,12 @@ TEST(AppControlTest, RepeatedArmRequestIsNoOp)
     AppControl tested_app(tested_sensor, tested_motor, tested_clock,
                           BalancePD(0.0f, 0.0f, 0.0f),
                           VelocityPI(100.0f, 100.0f, 10000.0f),
-                          TurnPD(0.0f, 0.0f));
+                          YawRateP(0.0f, 30.0f, 100));
 
     AppControl reference_app(reference_sensor, reference_motor, reference_clock,
                              BalancePD(0.0f, 0.0f, 0.0f),
                              VelocityPI(100.0f, 100.0f, 10000.0f),
-                             TurnPD(0.0f, 0.0f));
+                             YawRateP(0.0f, 30.0f, 100));
 
     tested_sensor.enc_l = 100;
     tested_sensor.enc_r = 100;
@@ -1466,7 +1466,7 @@ TEST(AppControlTest, ArmingSampleSeesOnlyItsOwnCounts)
     AppControl app(sensor, motor, clock,
                    BalancePD(0.0f, 0.0f, 0.0f),
                    VelocityPI(100.0f, 0.0f, 100000.0f),
-                   TurnPD(0.0f, 0.0f));
+                   YawRateP(0.0f, 30.0f, 100));
 
     sensor.accumulate_encoders = true;
     sensor.counts_per_poll_l = 100;
@@ -1497,7 +1497,7 @@ TEST(AppControlTest, ArmRejectedWhileFaulted)
     AppControl app(sensor, motor, clock,
                    BalancePD(200.0f, 0.0f, 0.0f),
                    VelocityPI(0.0f, 0.0f, 200.0f),
-                   TurnPD(0.0f, 0.0f));
+                   YawRateP(0.0f, 30.0f, 100));
 
     sensor.angle = 45.0f;
     sensor.fresh = true;
@@ -1524,7 +1524,7 @@ TEST(AppControlTest, AngleFaultDisarms)
     AppControl app(sensor, motor, clock,
                    BalancePD(200.0f, 0.0f, 0.0f),
                    VelocityPI(0.0f, 0.0f, 200.0f),
-                   TurnPD(0.0f, 0.0f));
+                   YawRateP(0.0f, 30.0f, 100));
 
     sensor.angle = 5.0f;
     sensor.fresh = true;
@@ -1553,7 +1553,7 @@ TEST(AppControlTest, StaleDisarms)
     AppControl app(sensor, motor, clock,
                    BalancePD(200.0f, 0.0f, 0.0f),
                    VelocityPI(0.0f, 0.0f, 200.0f),
-                   TurnPD(0.0f, 0.0f));
+                   YawRateP(0.0f, 30.0f, 100));
 
     sensor.angle = 5.0f;
     sensor.fresh = true;
@@ -1573,6 +1573,156 @@ TEST(AppControlTest, StaleDisarms)
     EXPECT_EQ(motor.last_left, 0);
     EXPECT_EQ(motor.last_right, 0);
 }
+
+TEST(AppControlTest, DefaultZeroTargetPreservesStraightMixAtZeroYaw)
+{
+    MockSensorHal sensor;
+    MockMotorHal motor;
+    MockMonotonicClock clock;
+
+    AppControl app(sensor, motor, clock,
+                   BalancePD(200.0f, 0.0f, 0.0f),
+                   VelocityPI(0.0f, 0.0f, 200.0f),
+                   YawRateP(2.0f, 30.0f, 100));
+
+    sensor.angle = 5.0f;
+    app.requestArm();
+    app.update();
+
+    EXPECT_EQ(motor.last_left, 10);
+    EXPECT_EQ(motor.last_right, 10);
+}
+
+TEST(AppControlTest, PositiveTurnEffortCreatesOppositeWheelDifferential)
+{
+    MockSensorHal sensor;
+    MockMotorHal motor;
+    MockMonotonicClock clock;
+
+    AppControl app(sensor, motor, clock,
+                   BalancePD(200.0f, 0.0f, 0.0f),
+                   VelocityPI(0.0f, 0.0f, 200.0f),
+                   YawRateP(2.0f, 30.0f, 100));
+
+    sensor.angle = 5.0f;
+    app.requestArm();
+    app.update(0.0f, 10.0f);                   // turn = +20: left/CCW
+
+    EXPECT_EQ(motor.last_left, -10);           // right wheel forward of left
+    EXPECT_EQ(motor.last_right, 30);
+}
+
+TEST(AppControlTest, TurnDoesNotAlterPreClampCommonSum)
+{
+    MockSensorHal sensor;
+    MockMotorHal motor;
+    MockMonotonicClock clock;
+
+    AppControl app(sensor, motor, clock,
+                   BalancePD(200.0f, 0.0f, 0.0f),
+                   VelocityPI(0.0f, 0.0f, 200.0f),
+                   YawRateP(2.0f, 30.0f, 100));
+
+    sensor.angle = 5.0f;
+    sensor.yaw_rate_dps = 5.0f;                // spinning CCW at zero target: turn = -10
+    app.requestArm();
+    app.update();
+
+    EXPECT_EQ(motor.last_left + motor.last_right, 20);
+    EXPECT_EQ(motor.last_right - motor.last_left, -20);
+}
+
+TEST(AppControlTest, DisarmedTargetCannotDrive)
+{
+    MockSensorHal sensor;
+    MockMotorHal motor;
+    MockMonotonicClock clock;
+
+    AppControl app(sensor, motor, clock,
+                   BalancePD(200.0f, 0.0f, 0.0f),
+                   VelocityPI(0.0f, 0.0f, 200.0f),
+                   YawRateP(10.0f, 30.0f, 100));
+
+    sensor.angle = 5.0f;
+    app.update(0.0f, 30.0f);                   // never armed
+
+    EXPECT_FALSE(app.armed());
+    EXPECT_EQ(motor.last_left, 0);
+    EXPECT_EQ(motor.last_right, 0);
+}
+
+TEST(AppControlTest, AngleFaultBeatsTurnTarget)
+{
+    MockSensorHal sensor;
+    MockMotorHal motor;
+    MockMonotonicClock clock;
+
+    AppControl app(sensor, motor, clock,
+                   BalancePD(200.0f, 0.0f, 0.0f),
+                   VelocityPI(0.0f, 0.0f, 200.0f),
+                   YawRateP(10.0f, 30.0f, 100));
+
+    sensor.angle = 5.0f;
+    app.requestArm();
+    app.update(0.0f, 30.0f);
+    ASSERT_TRUE(app.armed());
+
+    sensor.angle = 45.0f;
+    app.update(0.0f, 30.0f);
+
+    EXPECT_FALSE(app.armed());
+    EXPECT_EQ(motor.last_left, 0);
+    EXPECT_EQ(motor.last_right, 0);
+}
+
+TEST(AppControlTest, StaleFaultBeatsTurnTarget)
+{
+    MockSensorHal sensor;
+    MockMotorHal motor;
+    MockMonotonicClock clock;
+
+    AppControl app(sensor, motor, clock,
+                   BalancePD(200.0f, 0.0f, 0.0f),
+                   VelocityPI(0.0f, 0.0f, 200.0f),
+                   YawRateP(10.0f, 30.0f, 100));
+
+    sensor.angle = 5.0f;
+    app.requestArm();
+    app.update(0.0f, 30.0f);
+    ASSERT_TRUE(app.armed());
+
+    sensor.fresh = false;
+    clock.advance(25);
+    app.update(0.0f, 30.0f);                   // deadline: disarms
+
+    EXPECT_FALSE(app.armed());
+    EXPECT_EQ(motor.last_left, 0);
+    EXPECT_EQ(motor.last_right, 0);
+}
+
+TEST(AppControlTest, TargetAndEffortLimitsReachAppMix)
+{
+    MockSensorHal sensor;
+    MockMotorHal motor;
+    MockMonotonicClock clock;
+
+    AppControl app(sensor, motor, clock,
+                   BalancePD(200.0f, 0.0f, 0.0f),
+                   VelocityPI(0.0f, 0.0f, 200.0f),
+                   YawRateP(10.0f, 30.0f, 100));
+
+    sensor.angle = 5.0f;
+    app.requestArm();
+
+    app.update(0.0f, 50.0f);                   // target clamps to 30, effort clamps to 100
+    EXPECT_EQ(motor.last_left, -90);
+    EXPECT_EQ(motor.last_right, 110);
+
+    app.update(0.0f, -50.0f);
+    EXPECT_EQ(motor.last_left, 110);
+    EXPECT_EQ(motor.last_right, -90);
+}
+
 
 
 

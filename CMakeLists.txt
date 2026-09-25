@@ -36,7 +36,7 @@ add_executable(balance_tests
     src/app/app_control.cpp
     tests/test_balance_pd.cpp
     tests/test_velocity_pi.cpp
-    tests/test_turn_pd.cpp
+    tests/test_yaw_rate_p.cpp
     tests/test_app_control.cpp
     tests/test_operator_command.cpp
 )

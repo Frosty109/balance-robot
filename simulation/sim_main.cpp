@@ -23,7 +23,7 @@ int main()
                    clock,
                    BalancePD(200.0f, 0.8f, 0.0f),
                    VelocityPI(1.2f, 0.05f, 200.0f),
-                   TurnPD(5.0f, 0.1f));
+                   YawRateP(0.0f, 30.0f, 100));
 
     app.requestArm();
 
