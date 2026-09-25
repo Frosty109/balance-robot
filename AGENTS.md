@@ -39,8 +39,8 @@ but free-balance and push-recovery telemetry was captured and accepted on 2026-0
 
 Original evidence for both: `devlog/artefacts/2026-09-12-stage7-integral-windup-and-fault-recovery.txt`.
 Working plan for the pair: `plans/2026-09-14-pre-free-balance-safety-pair.md` — Phases A, B and C
-done. **The active plan is now `plans/2026-09-22-phase-d-to-first-free-balance.md`**, which breaks
-Phase D into steps with acceptance gates and is written to be actionable without prior context.
+done. Phase D followed in `plans/2026-09-22-phase-d-to-first-free-balance.md`; the active plan is
+now Stage 9 (see below).
 
 **Stage 7 (velocity integral) is closed.** On 2026-09-24 the operator changed only `Ki`, from 0 to
 the Yahboom reference value 35, while retaining the conservative integral limit of 200. On the
@@ -50,10 +50,55 @@ telemetry rows: angle -8.39° to +8.42°, peak absolute motor command 1040, `pol
 39/218 rows at the integral clamp. Evidence:
 `devlog/artefacts/2026-09-24-stage7-ki35-limit200-verification.txt`.
 
-**Stage 4b (`mid_angle`) is now the active task.** Use the freely balancing evidence rather than a
-passive resting angle. The 2026-09-24 captures contain several stationary equilibria, so do not
-select one telemetry window by convenience; follow the two-direction measurement method in Phase
-D2 of `plans/2026-09-22-phase-d-to-first-free-balance.md`.
+**Stage 4b (`mid_angle`) is closed at `0.0f`.** The operator reconfirmed on 2026-09-24 that it had
+already been checked and was fine. Earlier records contain a clean but unrepeated 3.3° hand
+measurement, later attempts spread from 0–4°, and Yahboom uses integer zero in its base mode. The
+car now balances and recovers from pushes at zero without the direction-dependent convergence
+failure that would identify a bad midpoint. Reopen only after an IMU/mass-layout change or if that
+signature appears.
+
+**Stage 3 FIFO/backlog acquisition is deferred by accepted-risk decision.** FIFO depth and worst-case
+sample age remain unmeasured because `Imu::read()` discards the DMP `more` count. The operator chose
+on 2026-09-24 not to add diagnostic/interface work while the car balances and recovers from pushes
+reliably at 199.6 Hz with 3–4 ms worst-case polls. Reopen on balance/timing trouble, added runtime
+load, or FIFO overflow; expose the `more` high-water mark before redesigning acquisition.
+
+**Battery measurement and cutoff restoration (D4) is deferred by accepted-risk decision.** The
+operator reports that the battery works with both this firmware and Yahboom's firmware. Both use
+the same ADC scale and 4.03 divider ratio, but Yahboom averages 50 readings over about one second
+where ours averages four immediate conversions, so a reading/filtering problem is plausible but
+unproven. Our cutoff remains off: continue supervised runs only and reopen before unattended use or
+on any independent sign of battery trouble.
+
+**B7 row 1 passed by operator report on 2026-09-24.** One `a` received during boot was purged: no
+`ARMED`, no wheel movement, and disarmed telemetry continued. No raw capture was supplied.
+
+**B7 row 8 passed on restrained hardware on 2026-09-24.** The accepted-sample injection produced
+stale shutdown at exactly 25 ms, no restart for 17.2 s, and a later arm rejection. Evidence:
+`devlog/artefacts/2026-09-24-b7-row8-stale-launch-gate.txt`. B7 is now 10/10.
+
+**The clean image was restored on 2026-09-25.** `FAULT_INJECT` has been removed from source, and a
+clean reflash was captured at the start of Stage 9 Phase 1.
+
+**Stage 9 (yaw-rate turn control) is closed, 2026-09-26.** Plan:
+`plans/2026-09-24-stage9-yaw-rate-turn-control.md`.
+
+- **Controller.** `TurnPD` is replaced by
+  `YawRateP(kp_pwm_per_dps, max_target_dps, max_effort)`, working in deg/s. Positive yaw means
+  left/CCW, as measured. Committed in `0d867d6`, `f94d16c` and `1240e22`; 68/68 host tests pass.
+- **Accepted image.** `YawRateP(1.0f, 30.0f, 100)` with a zero target, harness removed. The
+  `main.cpp` change is uncommitted.
+- **What kp=1.0 does.** It cancels the yaw that the ~10% stronger left motor adds during every
+  pitch recovery. kp=0.5 was too weak to do so.
+- **Turn directions.** A +15 deg/s pulse gave a slight, operator-confirmed left turn. Neither −15
+  pulse moved the car, because the wheels were stalled. The visible right turn and symmetry check
+  were waived, since Phase 6 demonstrates both actuator directions behaviourally.
+- **Carried to Stage 10: turn authority.** Commanded turns are weak at a 100-count cap when the
+  car is parked with stalled wheels.
+
+Evidence: `devlog/artefacts/2026-09-25-stage9-yaw-sign.txt` and the
+`2026-09-26-stage9-{phase4-plumbing,phase5-pulse,phase6-kp05,phase6-kp10,phase7-pos15,phase7-neg15,final}.txt`
+files.
 
 ### Free balancing — achieved, and what that changed
 
@@ -67,29 +112,29 @@ are — safety work that is done, and robustness work that is not.
 | Item | State |
 |---|---|
 | Stage 2B gates (TIM2 rate, host tests, poll duration, fault injection) | **closed** |
-| Intentional launch gate | **closed** — `09009ca` + `ab08218`, 2026-09-22; B7 rows 1 and 8 not run |
+| Intentional launch gate | **closed** — `09009ca` + `ab08218`; all 10 B7 hardware rows passed by 2026-09-24 |
 | Encoder backlog drain on fault/recovery | **closed** — `6cad87d`, 2026-09-18 |
+| Stage 4b `mid_angle` | **closed** — retain `0.0f`, reconfirmed 2026-09-24 after free-balance and push recovery |
 
 **Open — robustness, not gates.** These were listed as blocking free balancing and demonstrably
 did not block it. They still matter, for different reasons than originally claimed:
 
 | Item | Why it still matters |
 |---|---|
-| Stage 3 FIFO/EXTI acquisition decision | bounded sample age is a phase-lag question; it affects how *reliably* the car balances, not whether it can |
-| `mid_angle` trim (Stage 4b) | a midpoint error biases every control decision; the car balancing at `0.0f` is itself evidence worth reading — see below |
-| Battery cutoff restoration | commented out at `src/app/app_control.cpp:60`, and the threshold is `9.6f` against an **8.4 V pack**, so it would fire permanently if uncommented. Blocked behind a known-bad ADC measurement chain. Needed before unattended running |
-| B7 rows 1 and 8 | the startup purge is verified nowhere — not by any host test |
-| Turn sign fix (Stage 9) | moot while `TurnPD(0,0)` |
+| Stage 3 FIFO/EXTI acquisition decision | **deferred by accepted risk** — revisit only on balance/timing trouble or added runtime load |
+| Battery cutoff restoration | **deferred by accepted risk** — telemetry is untrustworthy; supervised runs only; reopen before unattended operation |
+| Commanded turns (Stage 10) | Stage 9 closed with yaw damping at kp=1.0. Turn *authority* on command is unproven; tune it with real serial commands, behind a watchdog |
 
 **The observed symptom, and what it means.** Before Stage 7 the car tended to move backwards, with
 the velocity integral state pinned at +200 when tested at a deliberately weak `Ki=4`. At `Ki=35`
 the state repeatedly left the clamp and the car returned to stationary balance after disturbances.
-It still settles at non-zero angles, so cable tug, centre-of-mass offset and `mid_angle` error remain
-indistinguishable from lean alone. `enc_l`/`enc_r` discriminate a stationary lean from creep. The
-stationary angles are useful D2 evidence, but the captures contain multiple equilibria rather than
-one value that can be copied directly into `mid_angle`.
+It still settles at non-zero angles, so cable tug, centre-of-mass offset and ordinary closed-loop
+error remain indistinguishable from lean alone. `enc_l`/`enc_r` discriminate a stationary lean from
+creep. `mid_angle=0.0f` is accepted; do not reopen it merely because one capture parks at a non-zero
+angle.
 
-Turn control and the battery cutoff remain off.
+The battery cutoff remains off. Yaw damping runs at kp=1.0 with a zero target. There is no way to
+command a turn until Stage 10's watchdogged command transport exists.
 
 ### Operating rule on hardware
 
