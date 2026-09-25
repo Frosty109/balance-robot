@@ -57,6 +57,7 @@ int YawRateP::compute(float target_yaw_rate_dps, float measured_yaw_rate_dps) co
     const float target = std::clamp(target_yaw_rate_dps, -max_target_dps_, max_target_dps_);
     const float error = target - measured_yaw_rate_dps;
 
+    // Truncation toward zero is deliberate: it gives a 1/kp deg/s deadband against gyro noise.
     const int requested = static_cast<int>(kp_pwm_per_dps_ * error);
     return std::clamp(requested, -max_effort_, max_effort_);
 }
