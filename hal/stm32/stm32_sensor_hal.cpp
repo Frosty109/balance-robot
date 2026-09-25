@@ -1,5 +1,4 @@
 #include "stm32_sensor_hal.hpp"
-// Raw gyro Z is already left/CCW-positive on this mounting (measured 2026-09-25); no sign flip.
 
 Stm32SensorHal::Stm32SensorHal(Encoder encoder_left,
                                 Encoder encoder_right,
@@ -20,7 +19,8 @@ bool Stm32SensorHal::init()
 
 float Stm32SensorHal::getAngle()        { return imu_.getPitch();    }
 float Stm32SensorHal::getGyroBalance()  { return imu_.getGyroX();    }
-float Stm32SensorHal::getYawRateDps()     { return imu_.getYawRateDps();    }
+// Raw gyro Z is already left/CCW-positive on this mounting (measured 2026-09-25); no sign flip.
+float Stm32SensorHal::getYawRateDps()   { return imu_.getYawRateDps(); }
 float Stm32SensorHal::getAccelZ()       { return imu_.getAccelZ();   }
 float Stm32SensorHal::getBattery()      { return battery_.read();    }
 int   Stm32SensorHal::getEncoderLeft()  { return encoder_left_.read();  }
