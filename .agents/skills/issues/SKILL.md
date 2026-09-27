@@ -5,6 +5,9 @@ description: Record technical problems from the current session in the project's
 
 # Session issues
 
+Review the session for errors, unexpected behaviour, things that did not work, open questions, and
+technical uncertainties.
+
 1. Target `issues/YYYY-MM-DD.md` using today's actual date. Create `issues/` if needed.
 2. Read today's file before writing and append or update rather than duplicating an issue.
 3. Keep root `ISSUES.md` unchanged; it is a separate running backlog.
@@ -15,7 +18,7 @@ description: Record technical problems from the current session in the project's
 
 **Status:** Resolved / Unresolved / Workaround
 
-**What happened:** Observable behavior and context.
+**What happened:** Observable behaviour and context.
 
 **Cause:** Established cause, or explicitly state that it remains unknown.
 

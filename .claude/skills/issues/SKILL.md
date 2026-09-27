@@ -1,0 +1,31 @@
+---
+name: issues
+description: Record technical problems from the current session in the project's dated issue log. Use when the user asks to document issues, errors, failed approaches, causes, resolutions, open technical questions, or explicitly invokes /issues.
+---
+
+<!-- Generated from .agents/skills/issues/SKILL.md by .agents/sync-claude-skills.sh. Edit the source. -->
+
+# Session issues
+
+Review the session for errors, unexpected behaviour, things that did not work, open questions, and
+technical uncertainties.
+
+1. Target `issues/YYYY-MM-DD.md` using today's actual date. Create `issues/` if needed.
+2. Read today's file before writing and append or update rather than duplicating an issue.
+3. Keep root `ISSUES.md` unchanged; it is a separate running backlog.
+4. Use this structure:
+
+```markdown
+## Short title
+
+**Status:** Resolved / Unresolved / Workaround
+
+**What happened:** Observable behaviour and context.
+
+**Cause:** Established cause, or explicitly state that it remains unknown.
+
+**Resolution:** What fixed it, what was tried, or the next discriminating test.
+```
+
+Separate evidence from inference. Preserve useful wrong turns when they explain how the cause was
+isolated. If there were no issues, create or update today's file with `No issues this session.`
