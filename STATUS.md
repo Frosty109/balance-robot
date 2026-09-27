@@ -12,8 +12,9 @@ Free-balance and push-recovery telemetry was captured and accepted on 2026-09-24
 free-standing run is undated.
 
 **Next: Stage 10, safe serial motion-command link.** Plan:
-`plans/2026-09-26-stage10-motion-command-link.md` — ready to implement once the operator has
-reviewed its §2 decisions. Commanded turns and drive need a watchdogged command transport first.
+`plans/2026-09-26-stage10-motion-command-link.md` — ready to implement; §2 decisions accepted
+2026-09-28, with disarm causes added (D1) and feedforward before the effort cap (D8). Commanded
+turns and drive need a watchdogged command transport first.
 
 **Queued behind it:**
 
@@ -87,7 +88,7 @@ These were once listed as gates to free balancing and demonstrably were not. The
 |---|---|---|
 | Stage 3 FIFO/backlog acquisition | FIFO depth and worst-case sample age unmeasured; `Imu::read()` discards the DMP `more` count. Balancing reliably at 199.6 Hz with 3–4 ms worst-case polls. | balance/timing trouble, added runtime load, or FIFO overflow — expose the `more` high-water mark before redesigning acquisition |
 | Battery measurement and cutoff (D4) | Cutoff off. Same ADC scale and 4.03 divider as Yahboom, but Yahboom averages 50 readings over ~1 s where ours averages four immediate conversions; a filtering problem is plausible but unproven. **Supervised runs only.** | before any unattended use, or any independent sign of battery trouble |
-| Commanded-turn authority | Weak at a 100-count cap with the car parked and wheels stalled. | Stage 10, with real serial commands behind a watchdog |
+| Commanded-turn authority | Weak with the car parked and wheels stalled. The 100-count cap is not the limit: with kp = 1.0 and targets clamped to 30 deg/s, `tr` ≤ 30. | Stage 10, with real serial commands behind a watchdog |
 
 **Lean versus creep.** At `Ki=4` the car crept backwards with the velocity integral pinned at +200.
 At `Ki=35` it returns to stationary balance, but still settles at non-zero angles, so cable tug,
