@@ -29,7 +29,6 @@ Objects/
 # Anchored to the repo root: unanchored "PLAN.md" also matched
 # .claude/commands/plan.md, because Git on Windows ignores case.
 /PLAN.md
-/CLAUDE.md
 /Learning-Journal/
 /sessions/
 /learning/

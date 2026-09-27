@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cmake -B build*)",
+      "Bash(cmake --build build*)",
+      "Bash(ctest *)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+      "Bash(sh .agents/sync-claude-skills.sh*)",
+      "PowerShell(cmake -B build*)",
+      "PowerShell(cmake --build build*)",
+      "PowerShell(ctest *)",
+      "PowerShell(git status*)",
+      "PowerShell(git diff*)",
+      "PowerShell(git log*)",
+      "PowerShell(git show*)"
+    ],
+    "ask": [
+      "Edit(/src/**)",
+      "Edit(/hal/**)",
+      "Edit(/bsp/**)",
+      "Edit(/stm32/**)",
+      "Edit(/simulation/**)",
+      "Edit(/tests/**)",
+      "Bash(*--target flash*)",
+      "Bash(*openocd*)",
+      "PowerShell(*--target flash*)",
+      "PowerShell(*openocd*)"
+    ]
+  }
+}

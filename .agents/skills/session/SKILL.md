@@ -14,12 +14,15 @@ description: Create or update the current project's dated session handoff. Use w
 # Session — YYYY-MM-DD
 
 ### What we did
-- Concrete outcomes, including important files, measurements, fixes, and decisions.
+- Concrete outcomes: files, functions, measurements, fixes, and decisions.
 
 ### What's next
-1. Ordered immediate steps with relevant files and verification work.
+1. Ordered immediate steps, naming files and what to verify.
 ```
 
 Make the document sufficient for a future session to resume without the conversation. Preserve
 useful existing details. Distinguish completed work from proposed work and record consequential
 unresolved uncertainty.
+
+If a stage opened or closed, or the accepted image changed, list updating `STATUS.md` under
+"What's next". Do not edit `STATUS.md` from this workflow unless asked.
