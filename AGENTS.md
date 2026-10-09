@@ -122,4 +122,7 @@ then run `sh .agents/sync-claude-skills.sh` to regenerate `.claude/skills/` (Cla
 as `/name`). `--check` reports drift. Codex's `implementation-plan` becomes Claude's `plan`.
 
 Skills: `session`, `learning`, `issues`, `implementation-plan` / `plan`, `session-finished`,
-`devlog`, `devlog-review`, `devlog-draft`.
+`devlog`, `devlog-review`, `devlog-draft`, `site-update`.
+
+`site-update` drafts the profile site's dated updates with the local model and pushes them live to
+the site's `main`; its config and ledger are in `devlog/site-update.json`.
