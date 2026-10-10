@@ -12,12 +12,13 @@ Free-balance and push-recovery telemetry was captured and accepted on 2026-09-24
 free-standing run is undated.
 
 **Active: Stage 10, safe serial motion-command link.** Plan:
-`plans/2026-09-26-stage10-motion-command-link.md`; §2 decisions accepted 2026-09-28. Phases 0–3
-done: frame parser, governor and byte ring in `a52210b` (host 94/94); USART RX ISR → ring in
-`72af2ab`, with `takeCommands()` kept as a bridge through the old operator decoder until Phase 4.
-Operator keys re-verified on that image 2026-10-10:
-`devlog/artefacts/2026-10-10-stage10-phase3-ring-keys.txt` (boot purge not exercised).
-**Next: Phase 4**, main-loop glue and telemetry; the car does not yet act on motion frames.
+`plans/2026-09-26-stage10-motion-command-link.md`; §2 decisions accepted 2026-09-28. Phases 0–6
+done 2026-10-10: parser, governor and ring `a52210b` (host 94/94); USART ISR → ring `72af2ab`;
+main-loop glue, link events and `vx`/`wz` telemetry `00735e0`; host drive tool `tools/drive.ps1`
+(gitignored, not in git); bench regression with every B7 row except a hardware receive error,
+`devlog/artefacts/2026-10-10-stage10-phase6-bench.txt`. Bytes are now handled in arrival order, so
+space then `a` in one loop pass arms. **The car now acts on motion frames when armed.**
+**Next: Phase 7 floor tests**, after the battery check below.
 
 **Queued behind it:**
 
@@ -29,8 +30,9 @@ Operator keys re-verified on that image 2026-10-10:
 
 **Accepted image.** `BalancePD(10200, 78, 0)`, `VelocityPI(7000, 35, 200)`,
 `YawRateP(1.0f, 30.0f, 100)` with a zero yaw target, `mid_angle = 0.0f`. Battery cutoff off.
-`FAULT_INJECT` removed from source. Flashed 2026-10-10: the `72af2ab` Phase 3 build, same gains;
-firmware `text` 45652 (45304 before Stage 10).
+`FAULT_INJECT` removed from source. Flashed 2026-10-10: the `00735e0` Phase 4 build, same gains,
+governor limits ±100 mm/s, ±30 deg/s, 200 mm/s², 60 deg/s², 250 ms; firmware `text` 48860 (45304
+before Stage 10).
 
 ## Closed milestones
 
@@ -91,7 +93,7 @@ These were once listed as gates to free balancing and demonstrably were not. The
 | Item | State | Reopen when |
 |---|---|---|
 | Stage 3 FIFO/backlog acquisition | FIFO depth and worst-case sample age unmeasured; `Imu::read()` discards the DMP `more` count. Balancing reliably at 199.6 Hz with 3–4 ms worst-case polls. | balance/timing trouble, added runtime load, or FIFO overflow — expose the `more` high-water mark before redesigning acquisition |
-| Battery measurement and cutoff (D4) | Cutoff off. Same ADC scale and 4.03 divider as Yahboom, but Yahboom averages 50 readings over ~1 s where ours averages four immediate conversions; a filtering problem is plausible but unproven. **Supervised runs only.** | before any unattended use, or any independent sign of battery trouble |
+| Battery measurement and cutoff (D4) | Cutoff off. Same ADC scale and 4.03 divider as Yahboom, but Yahboom averages 50 readings over ~1 s where ours averages four immediate conversions; a filtering problem is plausible but unproven. 2026-10-10: 5.4–6.0 V read while disarmed at zero duty (2S pack, ~8.4 V full), and one unexplained reboot while armed; neither measured at the pack. **Supervised runs only; multimeter check before Phase 7.** | before any unattended use, or any independent sign of battery trouble |
 | Commanded-turn authority | Weak with the car parked and wheels stalled. The 100-count cap is not the limit: with kp = 1.0 and targets clamped to 30 deg/s, `tr` ≤ 30. | Stage 10, with real serial commands behind a watchdog |
 
 **Lean versus creep.** At `Ki=4` the car crept backwards with the velocity integral pinned at +200.
