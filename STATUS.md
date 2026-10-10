@@ -3,7 +3,7 @@
 Where the project stands, with the evidence for each claim. Reconciled by the `status` skill;
 `AGENTS.md` holds the standing rules and does not repeat what is here.
 
-Last updated: 2026-09-28.
+Last updated: 2026-10-10.
 
 ## Now
 
@@ -11,10 +11,13 @@ Last updated: 2026-09-28.
 Free-balance and push-recovery telemetry was captured and accepted on 2026-09-24; the first
 free-standing run is undated.
 
-**Next: Stage 10, safe serial motion-command link.** Plan:
-`plans/2026-09-26-stage10-motion-command-link.md` — ready to implement; §2 decisions accepted
-2026-09-28, with disarm causes added (D1) and feedforward before the effort cap (D8). Commanded
-turns and drive need a watchdogged command transport first.
+**Active: Stage 10, safe serial motion-command link.** Plan:
+`plans/2026-09-26-stage10-motion-command-link.md`; §2 decisions accepted 2026-09-28. Phases 0–3
+done: frame parser, governor and byte ring in `a52210b` (host 94/94); USART RX ISR → ring in
+`72af2ab`, with `takeCommands()` kept as a bridge through the old operator decoder until Phase 4.
+Operator keys re-verified on that image 2026-10-10:
+`devlog/artefacts/2026-10-10-stage10-phase3-ring-keys.txt` (boot purge not exercised).
+**Next: Phase 4**, main-loop glue and telemetry; the car does not yet act on motion frames.
 
 **Queued behind it:**
 
@@ -26,7 +29,8 @@ turns and drive need a watchdogged command transport first.
 
 **Accepted image.** `BalancePD(10200, 78, 0)`, `VelocityPI(7000, 35, 200)`,
 `YawRateP(1.0f, 30.0f, 100)` with a zero yaw target, `mid_angle = 0.0f`. Battery cutoff off.
-`FAULT_INJECT` removed from source; clean image reflashed 2026-09-25.
+`FAULT_INJECT` removed from source. Flashed 2026-10-10: the `72af2ab` Phase 3 build, same gains;
+firmware `text` 45652 (45304 before Stage 10).
 
 ## Closed milestones
 
