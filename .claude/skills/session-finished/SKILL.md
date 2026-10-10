@@ -17,7 +17,16 @@ Complete these operations in order:
    its public-interest threshold. Skip this step silently when `devlog/` does not exist.
 5. If `devlog/site-update.json` exists, read `../site-update/SKILL.md` completely and publish
    today's site update. Skip this step silently when the file does not exist.
-6. Confirm the files created or updated and summarize any deliberately empty category.
+6. Run `../status/SKILL.md` only if this session hit one of these triggers:
+   - a stage, milestone or version opened, closed or changed;
+   - the accepted configuration or a decision in force changed;
+   - a new plan, component or top-level folder appeared;
+   - something this session proved a line in `STATUS.md` or `AGENTS.md` wrong.
+
+   Otherwise say "no status triggers this session". Do not skim the file to decide; a check run
+   every session becomes a check nobody reads.
+7. Confirm the files created or updated, summarize any deliberately empty category, and state
+   whether step 6 ran and why.
 
 Do not run `/plan`. Plans are created on demand, not automatically at session end.
 Do not pad learning or devlog records merely to make every category non-empty.

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Status Reconciliation"
+  short_description: "Reconcile STATUS.md against the repository."
+  default_prompt: "Use $status to check STATUS.md and AGENTS.md claims against the repo."

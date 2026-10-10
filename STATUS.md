@@ -1,7 +1,7 @@
 # balance-car-cpp status
 
-Where the project stands, with the evidence for each claim. Update this file when a stage opens or
-closes. `AGENTS.md` holds the standing rules and does not repeat what is here.
+Where the project stands, with the evidence for each claim. Reconciled by the `status` skill;
+`AGENTS.md` holds the standing rules and does not repeat what is here.
 
 Last updated: 2026-09-28.
 

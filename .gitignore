@@ -33,8 +33,6 @@ Objects/
 /sessions/
 /learning/
 /plans/
-/claude-config/
-/codex-config/
 /issues/
 /devlog/
 /captures/
@@ -44,6 +42,7 @@ Objects/
 balance-car-cpp-Complete-Rundown.md
 
 # Misc
+__pycache__/
 *.DS_Store
 Thumbs.db
 
