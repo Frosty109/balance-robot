@@ -1,4 +1,6 @@
 #include "app_control.hpp"
+#include "motion_link.hpp"
+#include <cmath>
 #include <cstdio>
 
 AppControl::AppControl(ISensorHal& sensor,
@@ -210,9 +212,10 @@ void AppControl::update(float move_x, float target_yaw_rate_dps)
         // i= is the clamped integral state. It cannot be derived from the other
         // fields: at the limits used early in the Stage 7 walk, the error in
         // estimating the P term is as large as the whole integral contribution.
-        printf("angle=%d bal=%d i=%d tr=%d gz=%d L=%d R=%d enc_l=%d enc_r=%d t=%lu poll=%lu\n",
+        printf("angle=%d bal=%d i=%d tr=%d vx=%ld wz=%d gz=%d L=%d R=%d enc_l=%d enc_r=%d t=%lu poll=%lu\n",
              (int)(angle * 100), balance, (int)velocity_.integral(),
-             turn, (int)(yaw_rate_dps * 10),
+             turn, std::lround(move_x / MOVE_X_PER_MM_S), (int)(target_yaw_rate_dps * 10),
+             (int)(yaw_rate_dps * 10),
              left, right, enc_l_sum_, enc_r_sum_,
              (unsigned long)clock_.nowMs(),
              (unsigned long)max_poll_ms_);
