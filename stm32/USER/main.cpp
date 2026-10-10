@@ -1,4 +1,5 @@
 #include <cstdio>
+#include <cstdio>
 
 extern "C" {
     #include "stm32f10x.h"
@@ -13,6 +14,7 @@ extern "C" {
 #include "../../hal/stm32/stm32_motor_hal.hpp"
 #include "../../hal/stm32/stm32_monotonic_clock.hpp"
 #include "../../src/app/app_control.hpp"
+#include "../../src/app/motion_link.hpp"
 
 int main()
 {
@@ -73,22 +75,71 @@ int main()
     printf("DISARMED reason=boot\n");
     usart.enableOperatorCommands();
 
+    // Stage 10 starting limits (plan §2): ±100 mm/s, ±30 deg/s, 200 mm/s², 60 deg/s², 250 ms timeout.
+    MotionGovernor governor({ 100.0f, 30.0f, 200.0f, 60.0f, 250 });
+    FrameParser    parser;
+    bool           link_was_alive     = false;
+    uint32_t       last_accepted_ms   = 0;
+    uint32_t       frame_errors       = 0;
+    uint32_t       printed_errors     = 0;
+    uint32_t       last_err_print_ms  = 0;   
+
     while (true)
     {
-        const OperatorCommands cmd = usart.takeCommands();
+        const uint32_t now = clock.nowMs();
 
-        switch (resolveOperatorCommands(cmd.arm, cmd.disarm))
+        if (usart.takeOverflow())
         {
-            case OperatorCommand::Arm:
-                app.requestArm();
-                break;
-            case OperatorCommand::Disarm:
-                app.requestDisarm();
-                break;
-            case OperatorCommand::None:
-                break;
+            if (app.armed()) { printf("LINK DISARM cause=overflow byte=0x00\n"); }
+            app.requestDisarm();
         }
 
-        app.update();
+        uint16_t entry;
+        while (usart.readByte(entry))
+        {
+            const LinkEvent ev = parser.feed(static_cast<uint8_t>(entry & 0xFF),
+                                             (entry & RxRing::ERROR_BIT) != 0);
+            switch (ev.kind)
+            {
+                case LinkEvent::Kind::Arm:
+                    app.requestArm();
+                    break;
+                case LinkEvent::Kind::Disarm:
+                    if (app.armed())
+                    {
+                        printf("LINK DISARM cause=%s byte=0x%02X\n", causeName(ev.cause), ev.byte);
+                    }
+                    app.requestDisarm();
+                    break;
+                case LinkEvent::Kind::Motion:
+                    if (governor.onCommand(ev.seq, ev.target, now)) { last_accepted_ms = now; }
+                    break;
+                case LinkEvent::Kind::FrameError:
+                    ++frame_errors;
+                    break;
+                case LinkEvent::Kind::None:
+                    break;
+            }
+        }
+
+        const MotionTarget target = governor.step(app.armed(), now);
+
+        // Read after step(): a disarmed step resets the governor, so frames while disarmed never flap LINK UP.
+        const bool link_alive = governor.linkAlive(now);
+        if (link_alive && !link_was_alive) { printf("LINK UP\n"); }
+        if (!link_alive && link_was_alive && app.armed())
+        {
+            printf("LINK LOST age=%lu\n", (unsigned long)(now - last_accepted_ms));
+        }
+        link_was_alive = link_alive;
+
+        if (frame_errors != printed_errors && now - last_err_print_ms >= 1000)
+        {
+            printf("FRAME ERR n=%lu\n", (unsigned long)frame_errors);
+            printed_errors    = frame_errors;
+            last_err_print_ms = now;
+        }
+
+        app.update(toMoveX(target.forward_mm_s), target.yaw_rate_dps);
     }
 }

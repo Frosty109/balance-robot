@@ -2,8 +2,6 @@
 
 #include "usart.hpp"
 
-#include "../../src/app/operator_command.hpp"
-
 extern "C" {
     #include "stm32f10x.h"
     #include "stm32f10x_gpio.h"
@@ -126,20 +124,6 @@ void Usart::enableOperatorCommands()
     USART_ITConfig(cfg_.usart, USART_IT_RXNE, ENABLE);
 
     primaskRestore(primask);
-}
-
-OperatorCommands Usart::takeCommands()
-{
-    OperatorCommands cmd { false, takeOverflow() };
-    uint16_t entry;
-    while (readByte(entry))
-    {
-        const OperatorCommand decoded = decodeOperatorByte(static_cast<uint8_t>(entry & 0xFF),
-                                                           (entry & RxRing::ERROR_BIT) != 0);
-        if (decoded == OperatorCommand::Arm)    { cmd.arm    = true; }
-        if (decoded == OperatorCommand::Disarm) { cmd.disarm = true; }
-    }
-    return cmd;
 }
 
 extern "C" void USART1_IRQHandler(void)

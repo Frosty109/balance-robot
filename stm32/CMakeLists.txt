@@ -12,6 +12,7 @@ add_executable(firmware.elf
     # shared application + STM32 HAL (same src/ .cpp the sim compiles)
     ${ROOT}/src/pid/pid_control.cpp
     ${ROOT}/src/app/app_control.cpp
+    ${ROOT}/src/app/motion_link.cpp
     ${ROOT}/hal/stm32/stm32_sensor_hal.cpp
     ${ROOT}/hal/stm32/stm32_motor_hal.cpp
     ${ROOT}/hal/stm32/stm32_monotonic_clock.cpp
