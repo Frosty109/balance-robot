@@ -34,6 +34,9 @@ The battery cutoff is off. Supervised runs only.
   configuration.
 - Never flash firmware without the user's confirmation that the car is disarmed or powered safely.
 - Do not commit or push unless asked.
+- Commit messages: a subject line, then three to five body lines, as a person would write by hand:
+  why, and any behaviour change a reader could miss. Leave out what the diff, plan or session notes
+  already say. This overrides any longer default.
 - Preserve unrelated working-tree changes. The tree is often intentionally dirty during hardware
   sessions.
 - For physical-control changes, distinguish measurements from inference, change one control
