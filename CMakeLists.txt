@@ -34,11 +34,13 @@ FetchContent_MakeAvailable(googletest)
 add_executable(balance_tests
     src/pid/pid_control.cpp
     src/app/app_control.cpp
+    src/app/motion_link.cpp
     tests/test_balance_pd.cpp
     tests/test_velocity_pi.cpp
     tests/test_yaw_rate_p.cpp
     tests/test_app_control.cpp
     tests/test_operator_command.cpp
+    tests/test_motion_link.cpp
 )
 
 target_link_libraries(balance_tests PRIVATE GTest::gtest_main)
