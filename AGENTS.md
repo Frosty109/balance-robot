@@ -5,7 +5,7 @@
 A C++ rewrite of the Yahboom STM32 self-balancing car. It exists to teach modern C++, keep a clean
 embedded architecture, and document the physical bring-up.
 
-**The car balances freely** on an operator `a`. Where the project stands — the accepted image,
+Where the project stands — the accepted image,
 closed stages with their evidence, open risks, and the next plan — is in **`STATUS.md`**. Read it
 before planning or advising on hardware work, and trust it over older plans or sessions.
 
@@ -122,7 +122,7 @@ then run `sh .agents/sync-claude-skills.sh` to regenerate `.claude/skills/` (Cla
 as `/name`). `--check` reports drift. Codex's `implementation-plan` becomes Claude's `plan`.
 
 Skills: `session`, `learning`, `issues`, `implementation-plan` / `plan`, `session-finished`,
-`devlog`, `devlog-review`, `devlog-draft`, `site-update`.
+`status`, `devlog`, `devlog-review`, `devlog-draft`, `site-update`.
 
 `site-update` drafts the profile site's dated updates with the local model and pushes them live to
 the site's `main`; its config and ledger are in `devlog/site-update.json`.

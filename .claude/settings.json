@@ -27,7 +27,11 @@
       "Bash(*--target flash*)",
       "Bash(*openocd*)",
       "PowerShell(*--target flash*)",
-      "PowerShell(*openocd*)"
+      "PowerShell(*openocd*)",
+      "Bash(*site_update.py publish*)",
+      "PowerShell(*site_update.py publish*)",
+      "Bash(git push*)",
+      "PowerShell(git push*)"
     ]
   }
 }
