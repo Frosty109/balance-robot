@@ -18,7 +18,14 @@ main-loop glue, link events and `vx`/`wz` telemetry `00735e0`; host drive tool `
 (gitignored, not in git); bench regression with every B7 row except a hardware receive error,
 `devlog/artefacts/2026-10-10-stage10-phase6-bench.txt`. Bytes are now handled in arrival order, so
 space then `a` in one loop pass arms. **The car now acts on motion frames when armed.**
-**Next: Phase 7 floor tests**, after the battery check below.
+Phase 7 (floor) partly done 2026-10-10: link behaviour on the floor passed (F1/F2), and hold-to-drive
+at 50 mm/s confirmed the **drive direction** — every hold that moved the car moved it the commanded
+way — but about half the holds stalled (`devlog/artefacts/2026-10-10-stage10-phase7-hold.txt`).
+F5–F9 and Phase 8 not run. The link is accepted; drive authority is the next stage.
+
+**Next: Stage 11, velocity authority** — `plans/2026-10-10-stage11-velocity-authority.md`. The
+velocity integral clamp (±200 at Ki 35) is only ±70 counts of motor command; the plan meters the
+battery first, then steps the limit 200 → 400 → 800, one image each.
 
 **Queued behind it:**
 
@@ -93,7 +100,7 @@ These were once listed as gates to free balancing and demonstrably were not. The
 | Item | State | Reopen when |
 |---|---|---|
 | Stage 3 FIFO/backlog acquisition | FIFO depth and worst-case sample age unmeasured; `Imu::read()` discards the DMP `more` count. Balancing reliably at 199.6 Hz with 3–4 ms worst-case polls. | balance/timing trouble, added runtime load, or FIFO overflow — expose the `more` high-water mark before redesigning acquisition |
-| Battery measurement and cutoff (D4) | Cutoff off. Same ADC scale and 4.03 divider as Yahboom, but Yahboom averages 50 readings over ~1 s where ours averages four immediate conversions; a filtering problem is plausible but unproven. 2026-10-10: 5.4–6.0 V read while disarmed at zero duty (2S pack, ~8.4 V full), and one unexplained reboot while armed; neither measured at the pack. **Supervised runs only; multimeter check before Phase 7.** | before any unattended use, or any independent sign of battery trouble |
+| Battery measurement and cutoff (D4) | Cutoff off. Same ADC scale and 4.03 divider as Yahboom, but Yahboom averages 50 readings over ~1 s where ours averages four immediate conversions; a filtering problem is plausible but unproven. 2026-10-10: ~7.5 V at run start but ~5.6 V straight after every disarm in later runs (2S pack, ~8.4 V full); one run with zero wheel motion at ±4800 commanded; one unexplained reboot while armed. None measured at the pack. **Supervised runs only; meter the pack before any further floor run (Stage 11 Phase 0).** | before any unattended use, or any independent sign of battery trouble |
 | Commanded-turn authority | Weak with the car parked and wheels stalled. The 100-count cap is not the limit: with kp = 1.0 and targets clamped to 30 deg/s, `tr` ≤ 30. | Stage 10, with real serial commands behind a watchdog |
 
 **Lean versus creep.** At `Ki=4` the car crept backwards with the velocity integral pinned at +200.
