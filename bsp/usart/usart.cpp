@@ -13,8 +13,8 @@ extern "C" {
 }
 
 namespace {
-    volatile bool rx_arm_;
-    volatile bool rx_disarm_;
+    RxRing rx_ring_;
+    volatile bool rx_overflow_;
 
     constexpr uint16_t RECEIVE_ERRORS = USART_FLAG_ORE | USART_FLAG_FE |
                                         USART_FLAG_NE | USART_FLAG_PE;
@@ -115,8 +115,8 @@ void Usart::enableOperatorCommands()
     // Purge bytes received during initialization so none can arm on the first loop.
     const uint32_t primask = primaskSave();
 
-    rx_arm_    = false;
-    rx_disarm_ = false;
+    rx_ring_.clear();
+    rx_overflow_ = false;
 
     if ((cfg_.usart->SR & USART_FLAG_RXNE) != 0)
     {
@@ -130,14 +130,15 @@ void Usart::enableOperatorCommands()
 
 OperatorCommands Usart::takeCommands()
 {
-    const uint32_t primask = primaskSave();
-
-    const OperatorCommands cmd { rx_arm_, rx_disarm_ };
-
-    rx_arm_    = false;
-    rx_disarm_ = false;
-
-    primaskRestore(primask);
+    OperatorCommands cmd { false, takeOverflow() };
+    uint16_t entry;
+    while (readByte(entry))
+    {
+        const OperatorCommand decoded = decodeOperatorByte(static_cast<uint8_t>(entry & 0xFF),
+                                                           (entry & RxRing::ERROR_BIT) != 0);
+        if (decoded == OperatorCommand::Arm)    { cmd.arm    = true; }
+        if (decoded == OperatorCommand::Disarm) { cmd.disarm = true; }
+    }
     return cmd;
 }
 
@@ -147,9 +148,20 @@ extern "C" void USART1_IRQHandler(void)
     const uint16_t sr   { USART1->SR };
     const uint8_t  byte { (uint8_t)USART_ReceiveData(USART1) };
 
-    const OperatorCommand cmd = decodeOperatorByte(byte,
-                                                   (sr & RECEIVE_ERRORS) != 0);
-    if (cmd == OperatorCommand::Arm)    { rx_arm_    = true; }
-    if (cmd == OperatorCommand::Disarm) { rx_disarm_ = true; }
+    const uint16_t entry = static_cast<uint16_t>(byte | ((sr & RECEIVE_ERRORS) != 0 ? RxRing::ERROR_BIT : 0));
+    if (!rx_ring_.push(entry)) { rx_overflow_ = true; }
 }
 
+bool Usart::readByte(uint16_t& entry)
+{
+    return rx_ring_.pop(entry);   // only the main loop pops, so no masking needed
+}
+
+bool Usart::takeOverflow()
+{
+    const uint32_t primask = primaskSave();
+    const bool overflow = rx_overflow_;
+    rx_overflow_ = false;
+    primaskRestore(primask);
+    return overflow;
+}

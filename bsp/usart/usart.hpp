@@ -3,6 +3,9 @@
 #include <cstdint>
 
 #include "../../src/app/operator_command.hpp"
+#include "../../src/app/byte_ring.hpp"
+
+using RxRing = ByteRing<64>;   // 64 entries ≈ 5.5 ms at 115200 baud; drained every loop pass
 
 extern "C" {
     #include "stm32f10x.h"
@@ -34,6 +37,9 @@ public:
 
     void enableOperatorCommands();
     OperatorCommands takeCommands();
+
+    bool readByte(uint16_t& entry);   // pops one entry - low byte = data, RxRing::ERROR_BIT = receive error
+    bool takeOverflow();              // true once if the ring overflowed since the last call
 
 private:
     UsartConfig cfg_;
