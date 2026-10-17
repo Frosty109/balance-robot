@@ -68,7 +68,7 @@ int main()
                    motor_hal,
                    clock,
                    BalancePD(10200.0f, 78.0f, 0.0f),
-                   VelocityPI(7000.0f, 35.0f, 200.0f),
+                   VelocityPI(7000.0f, 35.0f, 400.0f),
                    YawRateP(1.0f, 30.0f, 100));
 
     app.requestDisarm();
