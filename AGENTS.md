@@ -97,6 +97,11 @@ Flash through the CMake target, which rebuilds if needed, then programs, verifie
 cmake --build build-fw-stage1-clean --target flash
 ```
 
+Without the ST-Link, flash from the Radxa Q6A over the car's USB serial link: copy
+`build-fw-stage1-clean/stm32/firmware.bin` with `scp -p`, then run `tools/flash.sh` on the Q6A
+(`stm32flash`, DTR/RTS bootloader entry). Steps, drive tool and safety: `radxa/balance-car-README.md`.
+Either way, only flash with the car disarmed or off.
+
 ## Project records
 
 | Path | Holds | In git |
@@ -110,6 +115,8 @@ cmake --build build-fw-stage1-clean --target flash
 | `issues/` | dated retrospective issue records | no |
 | `devlog/` | public-facing notes and drafts; read `devlog/README.md` first | no |
 | `reviews/` | review findings and adjudications | yes |
+| `radxa/` | Q6A setup notes and the drive/flash workflow for the car | no |
+| `tools/` | host tools: `drive.ps1`, `drive.py`, `flash.sh` | no |
 | `Yahboom-Self-Balancing-Car/` | reference source; verify values here, not from memory | no |
 
 The local-only records are synced by MEGA and backed up with FreeFileSync to a second drive and to

@@ -11,6 +11,24 @@ Last updated: 2026-10-17.
 Free-balance and push-recovery telemetry was captured and accepted on 2026-09-24; the first
 free-standing run is undated.
 
+**Radxa Dragon Q6A stack mounted 2026-10-17** (about +360 g on a ~1 kg car: Q6A and heatsink
+179 g, power bank and cable 164 g, standoffs). With the motor plugs corrected after the rebuild,
+it balances and drives on the unchanged gains (`devlog/artefacts/2026-10-17-q6a-balance.txt`:
+untouched ±3.3°, holds +48/−174/+185 mm). **Cable-free operation works:** the car's Type-C goes to
+a Q6A USB port (`/dev/ttyUSB0`, `ch341` driver built in), the operator drives over SSH with
+`tools/drive.py` (stdlib-only port of `drive.ps1`; disarms on quit and on a dropped session, which
+is written but not yet tested), and firmware is flashed from the Q6A through the CH340 with
+`stm32flash` (DTR/RTS one-click entry; `tools/flash.sh`), no ST-Link needed. Workflow:
+`radxa/balance-car-README.md` (gitignored). Logs are written on the Q6A and copied back with `scp`.
+
+**Open: steady backward roll with the stack.** At zero target the car rolls back (≈30–135
+counts/100 ms) leaning forward, velocity integral pinned at +400. `mid_angle` 1.0/2.0 made it
+worse; `BalancePD(12240, 94, 0)` (balance ×1.2) helped on one run and was 4× worse on another, so
+run-to-run spread is larger than any gain effect seen. ×1.4 with `mid_angle` −1 oscillated. Logs in
+`~/balance-car/devlog/artefacts/2026-10-17-q6a-bench2.txt` **on the Q6A, not yet copied back**.
+Next discriminating test: three identical zero-target runs on one image, with a boot `GAINS` line
+so every log identifies its image.
+
 **The car drives on command.** Stage 11 closed 2026-10-17 at velocity integral limit 400: held
 50 mm/s commands moved the car the commanded way in 5/5 `w` and 4/4 `s` holds (see Notes below).
 
@@ -24,10 +42,19 @@ space then `a` in one loop pass arms. **The car now acts on motion frames when a
 Phase 7 (floor) partly done 2026-10-10: link behaviour on the floor passed (F1/F2), and hold-to-drive
 at 50 mm/s confirmed the **drive direction** — every hold that moved the car moved it the commanded
 way — but about half the holds stalled (`devlog/artefacts/2026-10-10-stage10-phase7-hold.txt`).
-F5–F9 and Phase 8 not run. The stalls were the velocity integral clamp, fixed by Stage 11.
+The stalls were the velocity integral clamp, fixed by Stage 11. 2026-10-17 on the Stage 11 image
+(`devlog/artefacts/2026-10-17-stage10-F5{,b,-F9}.txt`): **F5 passed** — `LINK LOST` at 250–251 ms
+on every pause, target slewed to 0 in ~0.3 s, car kept balancing, though it was moving only
+~25 mm/s at the pause. **F6 weak**: +27° and +23° over 21 s and 17 s at 5–30 deg/s (heading
+integrated from `gz`). **F7 not really tested**, **F8 weak** (+5°, +36 mm in 6 s). **F9 partial**:
+yaw to 30 deg/s bounded, 100 mm/s not tried. Phase 8 not run.
 
-**Next: Stage 10 turn runs F6–F8** on the Stage 11 image, with D8 feedforward as the first remedy
-if commanded turns are still weak; then F5, F9 and Phase 8 to close Stage 10.
+**Next: settle the backward roll** (above), then Yahboom-scale turn effort (below) tested
+cable-free, then F7–F9 and Phase 8 to close Stage 10. `plans/2026-09-09-sbc-integration-and-avoidance.md`
+is not yet updated for the USB link, weights and power. The onboard Bluetooth module (UART5,
+PC12/PD2, 9600 baud in Yahboom's code) is **confirmed BLE** (`YahBoom_BL`, service `FFE0`,
+characteristic `FFE1`, verified with nRF Connect on iOS); this PC's MediaTek adapter hangs in GATT
+discovery, so it is a fallback only.
 
 **Queued behind it:**
 
@@ -38,10 +65,15 @@ if commanded turns are still weak; then F5, F9 and Phase 8 to close Stage 10.
   Stage 10 closes.
 
 **Accepted image.** `BalancePD(10200, 78, 0)`, `VelocityPI(7000, 35, 400)`,
-`YawRateP(1.0f, 30.0f, 100)` with a zero yaw target, `mid_angle = 0.0f`. Battery cutoff off.
-`FAULT_INJECT` removed from source. Flashed 2026-10-17: `00735e0` plus the one-line Stage 11
-integral-limit change, governor limits ±100 mm/s, ±30 deg/s, 200 mm/s², 60 deg/s², 250 ms;
-firmware `text` 48860 at `00735e0` (45304 before Stage 10), not re-recorded for the Stage 11 build.
+`YawRateP(1.0f, 30.0f, 100)` with the yaw target from the link, `mid_angle = 0.0f`, motor
+`DEADZONE = 1300`. Battery cutoff off. `FAULT_INJECT` removed from source. Committed source is
+`076b4a6`. **At session end 2026-10-17 the car runs an uncommitted experiment,
+`BalancePD(12240, 94, 0)`** (build 14:33, flashed over serial); it is not accepted. Governor
+limits ±100 mm/s, ±30 deg/s, 200 mm/s², 60 deg/s², 250 ms. The accepted gains were last confirmed
+on the car after the `DEADZONE = 1500` experiment
+(`devlog/artefacts/2026-10-17-deadzone-1300-retest.txt`: max |`bal`| 508, no oscillation, a 2 s
+`w` hold moving +101 mm). Firmware `text` 49044 for the 2026-10-17 builds (48860 at `00735e0`,
+45304 before Stage 10).
 
 ## Closed milestones
 
@@ -120,7 +152,8 @@ These were once listed as gates to free balancing and demonstrably were not. The
 | Stage 3 FIFO/backlog acquisition | FIFO depth and worst-case sample age unmeasured; `Imu::read()` discards the DMP `more` count. Balancing reliably at 199.6 Hz with 3–4 ms worst-case polls. | balance/timing trouble, added runtime load, or FIFO overflow — expose the `more` high-water mark before redesigning acquisition |
 | Battery measurement and cutoff (D4) | Cutoff off. Same ADC scale and 4.03 divider as Yahboom, but Yahboom averages 50 readings over ~1 s where ours averages four immediate conversions; a filtering problem is plausible but unproven. 2026-10-10: ~7.5 V at run start but ~5.6 V straight after every disarm in later runs (2S pack, ~8.4 V full); one run with zero wheel motion at ±4800 commanded. 2026-10-17: `battery=` jumps between ~5.6 V and ~7.6 V within one 100 ms row, with the motors off, during disarmed tipping and after boot. Still not measured at the pack; Stage 11 Phase 0 was waived by the operator. **Supervised runs only.** | before any unattended use, or any independent sign of battery trouble |
 | Power loss while armed | Two reboots while armed and driving: 2026-10-10, and 2026-10-17 at 30.55 s of the first limit-400 run (USB link dropped, `BOOT` 1.2 s later, came up disarmed, then fell over). The CH340 is car-powered, so the board lost power. Cause not identified. The car drops rather than stopping under control. | before any run where a fall would cause damage, or a third occurrence |
-| Commanded-turn authority | Weak with the car parked and wheels stalled. The 100-count cap is not the limit: with kp = 1.0 and targets clamped to 30 deg/s, `tr` ≤ 30. The watchdogged link exists (Stage 10) and forward drive now has authority (Stage 11), but turn runs F6–F8 have not been done. | next: Stage 10 F6–F8 on the Stage 11 image, with D8 feedforward as the first remedy |
+| Commanded-turn authority | Measured weak 2026-10-17 (F6/F8 above): `tr` ≤ 30, and at a 25–30 deg/s target with the car still `L`/`R` sat at 45/95 (≈1345/1395 PWM) with no wheel motion. Yahboom's `Turn_PD` gives an in-place turn 36 × 1400/100 ≈ **504** counts, open-loop and unclamped. Planned change: `YawRateP` feedforward on the target with `max_effort` raised (e.g. `ff` 16, cap 500), not yet written. | the wireless link works; then test the feedforward image |
+| Wheels stalled between the dead-zone offset and breakaway | Inference from 2026-10-17 telemetry, not a direct measurement: wheels stay at rest with commands of ≈1450–1600 PWM after the 1300 offset, so the integral cannot unwind and the car can stand on powered, stalled motors (9 s at ≈1450 in F5). **Raising `DEADZONE` to 1500 made balance oscillate within 0.5 s** (`bal` ±1800–2000 at ~3–5 Hz, `devlog/artefacts/2026-10-17-deadzone-1500.txt`); reverted. | stalls return on the wireless image, or a breakaway measurement is wanted |
 
 **Lean versus creep.** At `Ki=4` the car crept backwards with the velocity integral pinned at +200.
 At `Ki=35` it returns to stationary balance, but still settles at non-zero angles, so cable tug,
