@@ -26,10 +26,14 @@ class VelocityPI
 class YawRateP
 {
     public: 
-        YawRateP(float kp_pwm_per_dps, float max_target_dps, int max_effort);
-        int compute(float target_yaw_rate_dps, float measured_yaw_rate_dps) const;
+        YawRateP(float kp_pwm_per_dps, float max_target_dps, 
+                 int max_effort, float ff_pwm_per_dps = 0.0f);
+
+        int compute(float target_yaw_rate_dps, 
+                    float measured_yaw_rate_dps) const;
 
     private:
         float kp_pwm_per_dps_, max_target_dps_;
-        int   max_effort_;
+        int max_effort_;
+        float ff_pwm_per_dps_;
 };

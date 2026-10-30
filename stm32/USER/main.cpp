@@ -64,12 +64,15 @@ int main()
     motor_hal.init();
     printf("MOTOR OK\n");
 
+    constexpr float velocity_integral_limit = 2000.0f;
+    printf("CONFIG velocity_integral_limit=%d\n",
+          static_cast<int>(velocity_integral_limit));
     AppControl app(sensor_hal,
                    motor_hal,
                    clock,
-                   BalancePD(10200.0f, 78.0f, 0.0f),
-                   VelocityPI(7000.0f, 35.0f, 400.0f),
-                   YawRateP(1.0f, 30.0f, 100));
+                   BalancePD(12240.0f, 94.0f, 0.0f),
+                   VelocityPI(7000.0f, 35.0f, velocity_integral_limit),
+                   YawRateP(1.0f, 30.0f, 100, 1.0f));
 
     app.requestDisarm();
     printf("DISARMED reason=boot\n");
