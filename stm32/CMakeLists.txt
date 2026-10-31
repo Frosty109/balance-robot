@@ -16,6 +16,7 @@ add_executable(firmware.elf
     ${ROOT}/hal/stm32/stm32_sensor_hal.cpp
     ${ROOT}/hal/stm32/stm32_motor_hal.cpp
     ${ROOT}/hal/stm32/stm32_monotonic_clock.cpp
+    ${ROOT}/hal/stm32/stm32_range_sensor.cpp
     # BSP C++ classes
     ${ROOT}/bsp/motor/motor.cpp
     ${ROOT}/bsp/encoder/encoder.cpp
@@ -23,6 +24,7 @@ add_executable(firmware.elf
     ${ROOT}/bsp/battery/battery.cpp
     ${ROOT}/bsp/usart/usart.cpp
     ${ROOT}/bsp/clock/tim2_millisecond_timer.cpp
+    ${ROOT}/bsp/ultrasonic/ultrasonic.cpp
     # entry point + interrupt vector handlers
     USER/main.cpp
     USER/stm32f10x_it.c

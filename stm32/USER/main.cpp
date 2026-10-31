@@ -1,5 +1,4 @@
 #include <cstdio>
-#include <cstdio>
 
 extern "C" {
     #include "stm32f10x.h"
@@ -13,6 +12,7 @@ extern "C" {
 #include "../../hal/stm32/stm32_sensor_hal.hpp"
 #include "../../hal/stm32/stm32_motor_hal.hpp"
 #include "../../hal/stm32/stm32_monotonic_clock.hpp"
+#include "../../hal/stm32/stm32_range_sensor.hpp"
 #include "../../src/app/app_control.hpp"
 #include "../../src/app/motion_link.hpp"
 
@@ -77,6 +77,9 @@ int main()
     app.requestDisarm();
     printf("DISARMED reason=boot\n");
     usart.enableOperatorCommands();
+
+    Stm32RangeSensor range_sensor(clock);
+    range_sensor.init();
 
     // Stage 10 starting limits (plan §2): ±100 mm/s, ±30 deg/s, 200 mm/s², 60 deg/s², 250 ms timeout.
     MotionGovernor governor({ 100.0f, 30.0f, 200.0f, 60.0f, 250 });
@@ -144,5 +147,7 @@ int main()
         }
 
         app.update(toMoveX(target.forward_mm_s), target.yaw_rate_dps);
+
+        range_sensor.poll();
     }
 }
