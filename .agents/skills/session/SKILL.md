@@ -24,5 +24,11 @@ Make the document sufficient for a future session to resume without the conversa
 useful existing details. Distinguish completed work from proposed work and record consequential
 unresolved uncertainty.
 
-If a stage opened or closed, or the accepted image changed, list updating `STATUS.md` under
-"What's next". Do not edit `STATUS.md` from this workflow unless asked.
+Before completing every session-document creation or update, read `../status/SKILL.md`
+completely and reconcile `STATUS.md` as part of the same workflow. This is required even
+when no stage, configuration or milestone changed; do not leave status reconciliation as
+a task for the next session or require a separate request. Report any substantive changes
+or that status was checked and unchanged, without inventing progress or padding the file.
+
+When called by `session-finished`, defer this reconciliation to its final status step so
+it runs once after all session records are complete.

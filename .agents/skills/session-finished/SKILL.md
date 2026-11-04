@@ -8,6 +8,7 @@ description: Complete the project's end-of-session documentation workflow. Use w
 Complete these operations in order:
 
 1. Read `../session/SKILL.md` completely and create or update today's session handoff.
+   Defer its required status reconciliation to step 6 below.
 2. Read `../learning/SKILL.md` completely and append only genuine new learning.
 3. Read `../issues/SKILL.md` completely and create or update today's issue record, including a
    no-issues entry when appropriate.
@@ -15,16 +16,12 @@ Complete these operations in order:
    its public-interest threshold. Skip this step silently when `devlog/` does not exist.
 5. If `devlog/site-update.json` exists, read `../site-update/SKILL.md` completely and publish
    today's site update. Skip this step silently when the file does not exist.
-6. Run `../status/SKILL.md` only if this session hit one of these triggers:
-   - a stage, milestone or version opened, closed or changed;
-   - the accepted configuration or a decision in force changed;
-   - a new plan, component or top-level folder appeared;
-   - something this session proved a line in `STATUS.md` or `AGENTS.md` wrong.
-
-   Otherwise say "no status triggers this session". Do not skim the file to decide; a check run
-   every session becomes a check nobody reads.
+6. Always read `../status/SKILL.md` completely and reconcile `STATUS.md` after the other
+   session records. Do not gate this step on milestones or other triggers, defer it to
+   another session, or require a separate request. If substantive status is unchanged,
+   report that it was checked; do not invent progress or pad the file.
 7. Confirm the files created or updated, summarize any deliberately empty category, and state
-   whether step 6 ran and why.
+   the result of the required status reconciliation.
 
 Do not run `$implementation-plan`. Plans are created on demand, not automatically at session end.
 Do not pad learning or devlog records merely to make every category non-empty.
