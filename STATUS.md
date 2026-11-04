@@ -3,7 +3,7 @@
 Where the project stands, with the evidence for each claim. Reconciled by the `status` skill;
 `AGENTS.md` holds the standing rules and does not repeat what is here.
 
-Last updated: 2026-10-30.
+Last updated: 2026-11-01.
 
 ## Now
 
@@ -11,6 +11,94 @@ Last updated: 2026-10-30.
 retained for supervised development after the 2026-10-24 holds, small-push recovery,
 direction-reversal and turn captures. Residual creep, cycling, hesitation and weak turn-rate
 tracking remain. Stage 10 is still open. Battery cutoff remains off.
+
+**Next: ROS 2 integration on the Q6A, starting with read-only range/state topics.**
+The operator agreed on 2026-11-01 to bring ROS forward and build proximity stopping as ROS
+nodes, replacing the earlier non-ROS-demo-first order. The updated
+`plans/2026-09-09-sbc-integration-and-avoidance.md` is **ready-to-implement**: publish existing
+serial telemetry while disarmed, verify the armed RANGE source change, add bounded command/arm/run
+handling, then demonstrate a supervised proximity stop. Revised after review the same day, it now
+holds the serial line grammar the bridge parses (§4.1), a replay adapter for drive.py logs, a
+no-reset-on-open check, a predicted armed dtmax of about 17-19 ms from blocking prints (inference,
+not measured), and a hold-to-run lease renewed by operator keystrokes so a Wi-Fi stall cannot keep
+a run alive. ROS is not yet verified installed; no ROS workspace exists. Jazzy targets the Q6A's
+Ubuntu 24.04 ARM64 platform; node language (Python or C++) is undecided. No further long
+static-distance capture is required to begin read-only integration.
+
+**Forward roadmap:** `plans/2026-11-01-feature-roadmap.md` (in-progress) sequences what follows:
+camera, expression display, odometry and bounded moves, a read-only LLM, a model router across
+Q6A/LAN/cloud models, voice, LiDAR, LLM-proposed actions, and a TypeScript web app starting as a
+reporting dashboard. No display or LiDAR is owned yet. Stage 10 and historical motion follow-ups
+remain open.
+
+**Project review 2026-11-01:** `reviews/2026-11-01-project-review-findings.md`. Findings bearing on
+status, none yet acted on: the running image was built from an uncommitted tree; both build trees
+have an empty `CMAKE_BUILD_TYPE`, so firmware is -O0 without `-g` (all timing evidence is at -O0);
+the IMU self-test bias branch never runs on an MPU6050 (result mask at most `0x3`, code tests
+`0x7`), so no boot bias is loaded; the 9.6 V cutoff remnants are a 3S value on this 2S car; the
+simulator is unrepresentative.
+
+**Passive HC-SR04 acquisition works; disarmed fresh-service timing now measured.** User-authored
+BSP/HAL and CMake/main integration is committed as `9c2554f`. PA0 triggers, PA1/TIM5_CH2 captures
+echo, internal TIM5_CH3 provides a 30 ms deadline, with attempts at least 100 ms apart. TIM2 clock,
+TIM3/4 encoders and TIM8 PWM are unchanged. Main services range after `app.update()`; sensing
+does not command motion. The flashed diagnostic image prints RANGE only while disarmed;
+acquisition continues while armed. Current source now uses `if (range_sensor.poll())`, enabling
+printing in both states. On 2026-11-04 the operator reported armed RANGE printing as fine; no
+capture or armed dtmax was saved, so the predicted armed load remains unmeasured. Completion timestamps
+retain conservative acquisition timing; capture errors use attempt start. Uncommitted `dtmax`
+tracks maximum successive fresh IMU
+poll-completion intervals, skips the first sample, persists across faults/arm/disarm and prints
+in disarmed telemetry. It includes intervening range/serial work; `poll` remains IMU-poll-only.
+
+2026-11-01 evidence:
+
+- `sessions/artefacts/2026-11-01/range-dtmax-flash-pasted.txt`: operator's Q6A programmer excerpt
+  verifies 52656 bytes and reset through the existing remote helper. Agent firmware build passed;
+  ELF text/data/bss **52516/140/2548 bytes**, binary **52656 bytes**. Existing syscall-stub linker
+  warnings remain. No new full host suite was run; latest saved result remains 96/96 on 2026-10-30.
+- `sessions/artefacts/2026-11-01/range-dtmax-01-pasted.txt`: BOOT/IMU/MOTOR, CONFIG limit 2000,
+  boot DISARMED; about 6 s of running telemetry, max poll 4 ms/dtmax 9 ms. One initial capture_error
+  is followed by 60 valid results; ages 0-4 ms. This is a pasted terminal capture.
+- Complete downloaded `sessions/artefacts/2026-11-01/2026-11-01-range-dtmax-02.txt`: 38.3 s,
+  383 valid range results, no sequence gaps, ages 0-4 ms. Its 296 disarmed telemetry rows have
+  poll 4 ms; dtmax changes 10->11 ms just after RECOVERED at host 5.491 s, then stays 11 through
+  the last disarmed row at 35.045 s. Angle fault -40.15 degrees at 35.072 s stops ordinary
+  telemetry; RANGE continues to 38.305 s. No STALE, arm or reboot appears; all transmitted
+  motion frames are zero. No printed dtmax is available after the final angle fault.
+
+These observations support proceeding with supervised integration. They do not establish
+FIFO sample age, added range-only latency, timeout-path timing, armed printing load or stopping
+clearance. The 11 ms maximum is an observed disarmed service gap below the 25 ms stale threshold,
+not a general safety bound. Gain changes are not indicated. Bad-echo/raw-pulse characterisation
+remains incomplete and can be targeted if integration exposes a problem.
+
+Earlier range evidence, retained without requiring repeat captures:
+`sessions/artefacts/2026-10-31/range-first-pasted.txt` has 71 results (70 valid, initial
+capture_error), boot/config limit 2000 and RANGE resuming after disarm, consistent with armed
+acquisition. `sessions/artefacts/2026-10-31/range-500mm-moved-pasted.txt` has 264 valid results;
+the operator moved the target. Selected seq 1539-1559 spans 489-507 mm, mean 500.14 mm.
+`sessions/artefacts/2026-10-31/range-1000mm-pasted.txt` has 330 valid/four timeouts with later
+valid returns; selected seq 2827-2952 median 1019 mm, mean 1024.78 mm. Operator judged accuracy
+sufficient; no calibration change planned. Operator-confirmed target removal/return around 500 mm
+in `sessions/artefacts/2026-10-31/range-target-loss-500mm-pasted.txt` has 351 valid/two early
+timeouts, with repeated near 500 mm sections and other valid background returns. Removal does
+not guarantee invalid sensing indoors. None of these captures establishes calibrated accuracy
+or armed-sensing acceptance. A temporary host harness previously passed 30 range HAL assertions;
+ARM syntax/format checks passed. GPIO/TIM5/ISR timing was not exercised by that harness.
+
+**Stock sensor hookup retained for first disarmed bring-up; electrical compatibility unmeasured.**
+User reported plugging the HC-SR04 directly into the YB-EST01-V2.0 board and asked to follow
+Yahboom. Their [car tutorial](https://www.yahboom.net/study/SBR-STM32/12245/#hardware-connection)
+explicitly specifies 5V/TRIG PA0/ECHO PA1/GND and direct installation, with no added divider.
+The local `Yahboom-Self-Balancing-Car/Yahboom Downloads/YB-EST01-V2.0.pdf` schematic likewise
+shows direct ECHO routing. PA1 is not marked 5 V tolerant in the
+[STM32 datasheet](https://www.st.com/resource/en/datasheet/stm32f103rc.pdf#page=32); actual ECHO
+high voltage/protection remains unmeasured and the discrepancy unexplained. The agent's divider
+proposal was an extra precaution, not a Yahboom assembly requirement. Retain the documented stock
+kit connection for the first restrained disarmed test; do not label voltage compliance verified
+or extend that decision to arbitrary replacement modules. First range output does not establish
+voltage compliance.
 
 **C++23 build/test validation completed 2026-10-30; hardware smoke passed by operator report.**
 `CMakeLists.txt` sets 23; generated host and firmware Ninja files contain `-std=gnu++23`.
@@ -21,22 +109,35 @@ After the transfer/flash instructions, the operator reported successful operatio
 `sessions/artefacts/2026-10-30/cpp23-smoke-pasted.txt`: moving/turn-command telemetry,
 `poll=4`, operator DISARMED at host 60.558 s, then an angle fault at 62.306 s while disarmed.
 The excerpt starts mid-run; BOOT/initialisation and programmer output are not included, although
-the tool summary counts one BOOT. **Current source velocity integral limit is 2000**, and the
+the tool summary counts one BOOT. **Current source velocity integral limit is 2000, intentionally
+increased as confirmed by the operator on 2026-10-31**, and the
 excerpt's `i` exceeds 1000. Do not describe this as an isolated standard-only hardware comparison
-or promote limit2000 to the earlier limit1000 acceptance. Full runtime configuration and the
-reason/timing of the limit change remain to be confirmed. Changes remain uncommitted.
+or promote limit 2000 to the earlier limit 1000 acceptance. Full runtime configuration and the
+timing of the limit change relative to the flashed image remain to be confirmed. C++23 is now
+committed as `23aeaaf`; limit 2000 and yaw feedforward source as `3aab687`. Commit existence
+does not extend the earlier control acceptance. The subsequent range checkpoint is `9c2554f`;
+range telemetry, fresh-interval diagnostic and the earlier yaw-test diff remain uncommitted.
 
 **Radxa Dragon Q6A stack mounted 2026-10-17:** about +360 g on a ~1 kg car (Q6A/heatsink
 179 g, power bank/cable 164 g, standoffs). With corrected motor plugs it balanced on the earlier
 gains (`devlog/artefacts/2026-10-17-q6a-balance.txt`: untouched ±3.3°, holds +48/−174/+185 mm).
 Cable-free operation works: car Type-C to Q6A USB (`/dev/ttyUSB0`, ch341 built in), driving
-through `tools/drive.py` over SSH, flashing through CH340 with `stm32flash`/`tools/flash.sh`.
+through `tools/drive.py` over SSH, flashing through CH340 with `stm32flash` and the existing
+Q6A `~/balance-car/flash.sh`.
 Quit disarm is exercised; dropped-SSH-session disarm is written but not hardware-verified.
 Workflow: `radxa/balance-car-README.md`. Full logs are on the Q6A; local evidence below is
 labelled `*-pasted.txt` where supplied as terminal excerpts rather than complete remote files.
 
+**Local flash-helper copy is damaged (2026-11-01).** `tools/flash.sh` is 52584 bytes of firmware
+binary data, not a shell script; how it was overwritten is unknown. Do not upload it over the
+working Q6A helper. The Q6A copy successfully flashed/verified 52656 bytes today. Recover and
+review the local script from that working copy or a verified backup before future helper
+transfers; the documented direct `stm32flash` command remains an alternative. The firmware
+binary and full diagnostic log transfers succeeded. No local helper repair was performed.
+
 **Serial startup remains intermittent; communication restored for testing.** The completed
-exit sequence `-rts,-dtr,dtr` remains in `tools/flash.sh` with write/verify and `-R`. Its
+exit sequence `-rts,-dtr,dtr` is confirmed in the successful 2026-11-01 Q6A programmer output;
+write/verify/reset succeeded. The local helper copy is damaged as noted above. The earlier
 2026-10-21 recovery was not a complete fix; see
 `devlog/artefacts/2026-10-21-limit-1000-flash-and-silent-start-excerpt.txt`.
 On 2026-10-24 the first `tools/check-startup.py` hardware run received `RECOVERED` after 6.7 s,
@@ -78,8 +179,8 @@ Speeds use mean wheel counts, 6.27 counts/mm and nominal 100 ms telemetry window
 independent ground-distance measurements. Calculation windows and qualifications are in the
 evidence summary above.
 
-Historical comparison: 2026-10-21 limit400 saturated windows averaged 91/97 mm/s backward;
-limit800 settled saturated windows averaged 27/25 (`i=800` throughout). Those selected windows
+Historical comparison: 2026-10-21 limit 400 saturated windows averaged 91/97 mm/s backward;
+limit 800 settled saturated windows averaged 27/25 (`i=800` throughout). Those selected windows
 and today's whole holds are different statistics, not a controlled percentage-improvement claim.
 Evidence: `devlog/artefacts/2026-10-21-rollback-limit-{400,800}-pasted.txt`.
 Earlier midpoint 1.0/2.0 trials worsened roll; balance ×1.4/midpoint −1 oscillated; single
@@ -94,58 +195,65 @@ main-loop glue/telemetry `00735e0`, host tools. Bench covered every B7 row excep
 receive error (`devlog/artefacts/2026-10-10-stage10-phase6-bench.txt`). Arrival order means
 space then `a` in one pass arms. F1/F2 passed; F3/F4 stalls in
 `devlog/artefacts/2026-10-10-stage10-phase7-hold.txt` were addressed by Stage 11 (closed
-2026-10-17 at integral400, 5/5 forward and 4/4 backward holds). At that image F5 passed:
+2026-10-17 at integral 400, 5/5 forward and 4/4 backward holds). At that image F5 passed:
 `LINK LOST` at 250–251 ms, targets reached zero in ~0.3 s, balance continued; only ~25 mm/s
 actual speed at pause. F6/F8 were weak, F7 not properly tested, F9 yaw partial/100 mm/s untried.
 Historical evidence: `devlog/artefacts/2026-10-17-stage10-F5{,b,-F9}.txt`.
 
-**2026-10-24 turn update: ff=1, cap100 retained.** User added optional fourth yaw constructor
+**2026-10-24 turn update: ff=1, cap 100 retained.** User added optional fourth yaw constructor
 argument; feedforward uses the clamped target before the combined effort clamp. Default ff=0
 preserves callers. Host build and **96/96 tests passed**, including two new feedforward tests.
 `YawRateP(1,30,100,1)` floor capture demonstrated both turn directions up to ±30°/s and short
 +50 mm/s/left-yaw motion, operator-confirmed. At forward target zero, aggregate mean yaw
 was +2.4°/s at +10, +8.0°/s at +30 and −12.4°/s at −30. At +50/+30, ten rows averaged
 +12.9°/s. Mixed windows include cycling/transients: direction/useful rotation demonstrated,
-not accurate rate tracking or stationary in-place turns. Pitch −2.36°..+4.59°, peak |tr|60
-below cap100, `poll=4`, acknowledged operator disarm, no armed fault/reboot. Evidence:
+not accurate rate tracking or stationary in-place turns. Pitch −2.36°..+4.59°, peak |tr| 60
+below cap 100, `poll=4`, acknowledged operator disarm, no armed fault/reboot. Evidence:
 `devlog/artefacts/2026-10-24-yaw-ff1-left10-pasted.txt`. F6/F7 direction now demonstrated;
 F8 left-curve evidence improved. Failure-path regression on this image remains open.
 
-**Next: establish the intended velocity limit and current image identity**, then resume the
-combined forward/right motion, return-to-zero and remaining F9 limits. The 2026-10-30 excerpt
-is a smoke test, not closure of that prescribed sequence. Repeat F2/F5 regressions were deliberately
-deferred by the operator on 2026-10-26; historical passes remain historical. Optional Phase 8
-physical cable pull still needs a run/defer decision. Dropped-SSH-session disarm remains
-unverified on hardware. Keep control settings fixed through the remaining motion tests;
-stronger turn effort is not the immediate next change.
-The SBC plan `plans/2026-09-09-sbc-integration-and-avoidance.md` is direction-setting and
-not updated for USB/weights/power. Onboard BLE is a fallback: UART5 PC12/PD2, 9600 baud in
-reference, `YahBoom_BL`, FFE0/FFE1 verified with nRF Connect; PC MediaTek GATT discovery hangs.
+**Motion acceptance remains separate from ROS bring-up.** Today's 52656-byte programming
+verification and BOOT/config/dtmax capture establish the new range diagnostic image running
+with integral limit 2000; every gain is not printed at runtime. The 2026-10-30 smoke excerpt and
+today's disarmed captures do not close the combined forward/right, return-to-zero or remaining
+F9 rows. Repeat F2/F5 was deliberately deferred on 2026-10-26; optional physical cable pull
+still needs a run/defer decision. Dropped-SSH-session disarm remains hardware-unverified.
+Keep control settings fixed. Add command expiry, operator-loss and stop-path checks with the
+ROS command/proximity feature trials; read-only ROS work need not wait for full Stage 10 closure.
+The updated ROS integration plan above governs the new order. Passive range evidence is
+sufficient to start that work; measured stopping clearance and useful range while balancing
+remain to be established before accepting a proximity-stop demonstration. Onboard BLE remains
+a fallback: UART5 PC12/PD2, reference 9600 baud, `YahBoom_BL`, FFE0/FFE1 verified with nRF Connect;
+PC MediaTek GATT discovery hangs.
 
 **C++23:** validation complete with the hardware-comparison qualification above;
-`plans/2026-09-26-cpp23-migration.md`. No migration commit made.
+`plans/2026-09-26-cpp23-migration.md`. Migration committed as `23aeaaf`.
 **Queued:** simulation/self-righting/open-source rebuild
 (`plans/2026-09-28-simulation-self-righting-open-source-roadmap.md`, after Stage 10).
 
 **Last documented control acceptance (2026-10-24).** Configuration:
 `BalancePD(12240,94,0)`, `VelocityPI(7000,35,1000)`, `YawRateP(1,30,100,1)`, yaw target from
 link, `mid_angle=0`, `DEADZONE=1300`. User reported build/flash; supplied programmer output
-verifies a 49,280-byte binary followed by running turn telemetry. `i` reaches1000 and `tr`
-is consistent with ff=1. On 2026-10-26 a boot banner directly confirmed limit1000, but not every
-gain. Current source instead sets limit2000, as qualified above; the boot print shares that
-constant with the constructor. Source/test changes remain **uncommitted**. Last committed
-firmware baseline remains `076b4a6`: balance `(10200,78,0)`, velocity `(7000,35,400)`, yaw
-`(1,30,100)`; repository HEAD is docs commit `a39c693`. Historical Stage 11 remains closed
-at that earlier configuration. Battery cutoff off; `FAULT_INJECT` absent. Governor unchanged:
-±100 mm/s, ±30 deg/s, 200 mm/s², 60 deg/s², 250 ms. Latest host build/CTest **96/96 passed**.
-Latest user firmware build succeeded; 2026-10-30 ELF text/data/bss are 49140/140/2548 bytes.
-The historical 49,280-byte programming image is not the ELF text section.
+verifies a 49,280-byte binary followed by running turn telemetry. `i` reaches 1000 and `tr`
+is consistent with ff=1. On 2026-10-26 a boot banner directly confirmed limit 1000, but not every
+gain. Current source instead sets limit 2000, as qualified above; the boot print shares that
+constant with the constructor. Control settings introduced in `3aab687` are unchanged in HEAD
+`9c2554f`: balance `(12240,94,0)`, velocity `(7000,35,2000)`, yaw `(1,30,100,1)`. A yaw-test diff,
+range telemetry (now also enabled while armed in source) and the fresh-interval diagnostic
+remain uncommitted. Historical Stage 11 remains closed at the earlier `076b4a6`
+configuration, not the larger current limit. Battery cutoff off; `FAULT_INJECT` absent. Governor unchanged:
+±100 mm/s, ±30 deg/s, 200 mm/s², 60 deg/s², 250 ms. Latest full host build/CTest **96/96 passed
+(2026-10-30)**; not rerun on 2026-11-01. Latest firmware build passed today, ELF text/data/bss
+52516/140/2548 bytes. Operator Q6A output verifies a 52656-byte write and reset; the subsequent
+BOOT/config/dtmax capture confirms the diagnostic runs with limit 2000. No readback hash or
+full runtime gain banner was supplied. The historical 49280-byte and 52584-byte programming
+images are superseded for current diagnostic work; binary lengths are not ELF text sizes.
 
 ## Closed milestones
 
 | Milestone | Where | Evidence |
 |---|---|---|
-| C++23 build/test validation and reported hardware smoke | 2026-10-30, uncommitted; hardware comparison qualified by limit2000 source | `sessions/2026-10-30.md` |
+| C++23 build/test validation and reported hardware smoke | 2026-10-30, `23aeaaf`; hardware comparison qualified by limit 2000 source | `sessions/2026-10-30.md` |
 | Fresh-packet-gated control | `fa6eb90` | |
 | 1 kHz TIM2 monotonic clock behind `IMonotonicClock`; rate measured at 1.001 | `1bd5bb4` | |
 | Stage 2B stale-data motor shutdown — all four gates | verified on a clean image 2026-09-05 | |
@@ -216,15 +324,15 @@ These were once listed as gates to free balancing and demonstrably were not. The
 
 | Item | State | Reopen when |
 |---|---|---|
-| Stage 3 FIFO/backlog acquisition | FIFO depth and worst-case sample age unmeasured; `Imu::read()` discards the DMP `more` count. Balancing reliably at 199.6 Hz with 3–4 ms worst-case polls. | balance/timing trouble, added runtime load, or FIFO overflow — expose the `more` high-water mark before redesigning acquisition |
+| Stage 3 FIFO/backlog acquisition | FIFO depth and worst-case sample age unmeasured; `Imu::read()` discards the DMP `more` count. Earlier balancing at 199.6 Hz with 3–4 ms worst-case polls. Disarmed range/serial-load diagnostic observed max fresh-service interval 11 ms on 2026-11-01; armed printing and timeout-path load remain unmeasured. FIFO sample age is still unknown. | balance/timing trouble, added runtime load, or FIFO overflow — expose the `more` high-water mark before redesigning acquisition |
 | Battery measurement and cutoff (D4) | Cutoff off. Same ADC scale and 4.03 divider as Yahboom, but Yahboom averages 50 readings over ~1 s where ours averages four immediate conversions; a filtering problem is plausible but unproven. 2026-10-10: ~7.5 V at run start but ~5.6 V straight after every disarm in later runs (2S pack, ~8.4 V full); one run with zero wheel motion at ±4800 commanded. 2026-10-17: `battery=` jumps between ~5.6 V and ~7.6 V within one 100 ms row, with the motors off, during disarmed tipping and after boot. Still not measured at the pack; Stage 11 Phase 0 was waived by the operator. **Supervised runs only.** | before any unattended use, or any independent sign of battery trouble |
-| Reboot while armed | Two reboots while armed/driving: 2026-10-10 and 2026-10-17 at 30.55 s of the first limit400 run (USB dropped, BOOT 1.2 s later, disarmed, then fell). Power loss was inferred, not electrically measured. On 2026-10-24 CH340 remained present with the switch off, so adapter presence cannot establish MCU power. No third armed reboot shown today; cause still unknown. | before a run where a fall would cause damage, or a third occurrence |
-| Commanded-turn tracking | ff=1/cap100 now demonstrated both directions and short combined left motion. At zero forward target, ±30°/s requests averaged +8.0/−12.4°/s across mixed windows; max absolute tr60. Direction works, precise tracking remains weak. Keep gains/cap unchanged through remaining regressions. Earlier ff16/cap500 proposal is not the next accepted change. | after link-loss/combined-motion regression, if stronger or more accurate turning is required |
+| Reboot while armed | Two reboots while armed/driving: 2026-10-10 and 2026-10-17 at 30.55 s of the first limit 400 run (USB dropped, BOOT 1.2 s later, disarmed, then fell). Power loss was inferred, not electrically measured. On 2026-10-24 CH340 remained present with the switch off, so adapter presence cannot establish MCU power. No third armed reboot shown today; cause still unknown. | before a run where a fall would cause damage, or a third occurrence |
+| Commanded-turn tracking | ff=1/cap 100 now demonstrated both directions and short combined left motion. At zero forward target, ±30°/s requests averaged +8.0/−12.4°/s across mixed windows; max absolute tr 60. Direction works, precise tracking remains weak. Keep gains/cap unchanged through remaining regressions. Earlier ff 16/cap 500 proposal is not the next accepted change. | after link-loss/combined-motion regression, if stronger or more accurate turning is required |
 | Intermittent serial startup | 2026-10-26 receiver-open physical reset captured genuine BOOT/config. Explicit drive-tool DTR/RTS settings restored output and reopening received telemetry. Automatic startup reliability and electrical cause remain unresolved; no pin measurements. See Now. | any recurrence; establish supported upright RX before arming, power off before handling when disarm is unacknowledged |
 | Wheels stalled between the dead-zone offset and breakaway | Inference from 2026-10-17 telemetry, not a direct measurement: wheels stay at rest with commands of ≈1450–1600 PWM after the 1300 offset, so the integral cannot unwind and the car can stand on powered, stalled motors (9 s at ≈1450 in F5). **Raising `DEADZONE` to 1500 made balance oscillate within 0.5 s** (`bal` ±1800–2000 at ~3–5 Hz, `devlog/artefacts/2026-10-17-deadzone-1500.txt`); reverted. | stalls return on the wireless image, or a breakaway measurement is wanted |
 
 **Lean versus creep.** On the earlier chassis, `Ki=4` crept backwards with the velocity integral
 pinned at +200; `Ki=35` returned to stationary balance but still settled at non-zero angles.
-The added stack has residual creep at `Ki=35` even with accepted limit1000 (above). Cable tug,
+The added stack has residual creep at `Ki=35` even with accepted limit 1000 (above). Cable tug,
 centre-of-mass offset and closed-loop error are indistinguishable from lean alone. `enc_l`/`enc_r`
 tell a stationary lean from creep.

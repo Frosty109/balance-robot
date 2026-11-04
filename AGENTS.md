@@ -98,8 +98,9 @@ cmake --build build-fw-stage1-clean --target flash
 ```
 
 Without the ST-Link, flash from the Radxa Q6A over the car's USB serial link: copy
-`build-fw-stage1-clean/stm32/firmware.bin` with `scp -p`, then run `tools/flash.sh` on the Q6A
-(`stm32flash`, DTR/RTS bootloader entry). Steps, drive tool and safety: `radxa/balance-car-README.md`.
+`build-fw-stage1-clean/stm32/firmware.bin` with `scp -p`, then run `~/balance-car/flash.sh` on the
+Q6A (`stm32flash`, DTR/RTS bootloader entry). The local `tools/flash.sh` copy is damaged; do not
+upload it (STATUS.md). Steps, drive tool and safety: `radxa/balance-car-README.md`.
 Either way, only flash with the car disarmed or off.
 
 ## Project records
@@ -133,6 +134,10 @@ as `/name`). `--check` reports drift. Codex's `implementation-plan` becomes Clau
 
 Skills: `session`, `learning`, `issues`, `implementation-plan` / `plan`, `session-finished`,
 `status`, `devlog`, `devlog-review`, `devlog-draft`, `site-update`.
+
+Whenever creating or updating a session document, or finishing a session, reconcile `STATUS.md`
+as part of the same workflow using the `status` skill. This is always required, without a separate
+request or milestone trigger. In `session-finished`, do it once after the other session records.
 
 `site-update` drafts the profile site's dated updates with the local model and pushes them live to
 the site's `main`; its config and ledger are in `devlog/site-update.json`.
