@@ -50,3 +50,22 @@ TEST(YawRatePTest, FractionalResultTruncatesTowardZero)
     EXPECT_EQ(ctrl.compute(-1.9f, 0.0f), 0);   // toward zero, not floor (floor gives -1)
     EXPECT_EQ(ctrl.compute(2.0f, 0.0f), 1);
 }
+
+TEST(YawRatePTest, FeedforwardRemainsWhenTargetIsReached)
+{
+    YawRateP ctrl(1.0f, 30.0f, 100, 2.5f);
+
+    EXPECT_EQ(ctrl.compute(10.0f, 10.0f), 25);
+    EXPECT_EQ(ctrl.compute(-10.0f, -10.0f), -25);
+}
+
+TEST(YawRatePTest, FeedforwardRespectsTargetAndEffortLimits)
+{
+    YawRateP target_limited(1.0f, 30.0f, 1000, 2.0f);
+    EXPECT_EQ(target_limited.compute(50.0f, 0.0f), 90);
+    EXPECT_EQ(target_limited.compute(-50.0f, 0.0f), -90);
+
+    YawRateP effort_limited(1.0f, 30.0f, 100, 3.0f);
+    EXPECT_EQ(effort_limited.compute(30.0f, 0.0f), 100);
+    EXPECT_EQ(effort_limited.compute(-30.0f, 0.0f), -100);
+}
