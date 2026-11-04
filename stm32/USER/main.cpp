@@ -16,6 +16,23 @@ extern "C" {
 #include "../../src/app/app_control.hpp"
 #include "../../src/app/motion_link.hpp"
 
+namespace
+{
+    const char* rangeStatusName(RangeStatus status)
+    {
+        switch (status)
+        {
+        case RangeStatus::starting:      return "starting";
+        case RangeStatus::valid:         return "valid";
+        case RangeStatus::no_echo:       return "no_echo";
+        case RangeStatus::timeout:       return "timeout";
+        case RangeStatus::out_of_range:  return "out_of_range";
+        case RangeStatus::capture_error: return "capture_error";
+        }
+        return "unknown";
+    }
+}
+
 int main()
 {
     NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
@@ -148,6 +165,17 @@ int main()
 
         app.update(toMoveX(target.forward_mm_s), target.yaw_rate_dps);
 
-        range_sensor.poll();
+        if (range_sensor.poll())
+        {
+            const RangeSample sample = range_sensor.latest();
+            const std::uint32_t age_ms = clock.nowMs() - sample.completed_ms;
+
+            printf("RANGE v=1 seq=%lu t=%lu mm=%lu st=%s age=%lu\n",
+                static_cast<unsigned long>(sample.sequence),
+                static_cast<unsigned long>(sample.completed_ms),
+                static_cast<unsigned long>(sample.distance_mm),
+                rangeStatusName(sample.status),
+                static_cast<unsigned long>(age_ms));
+        }
     }
 }

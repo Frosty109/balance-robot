@@ -97,6 +97,15 @@ void AppControl::update(float move_x, float target_yaw_rate_dps)
         return;
     }
 
+    if (have_fresh_sample_)
+    {
+        const std::uint32_t interval_ms = after - last_fresh_ms_;
+        if (interval_ms > max_fresh_interval_ms_)
+        {
+            max_fresh_interval_ms_ = interval_ms;
+        }
+    }
+    have_fresh_sample_ = true;
     last_fresh_ms_ = after;
 
     // Encoder needs to be drained on every fresh sample so gated samples discard counts
@@ -177,12 +186,13 @@ void AppControl::update(float move_x, float target_yaw_rate_dps)
         if (++telemetry_tick_ >= TELEMETRY_DECIMATION)
         {
             telemetry_tick_ = 0;
-            printf("state=DISARMED angle=%d gz=%d battery=%d t=%lu poll=%lu\n",
+            printf("state=DISARMED angle=%d gz=%d battery=%d t=%lu poll=%lu dtmax=%lu\n",
                  (int)(angle * 100), 
                  (int)(sensor_.getYawRateDps() * 10),
                  (int)(battery * 100),
                  (unsigned long)clock_.nowMs(),
-                 (unsigned long)max_poll_ms_);
+                 (unsigned long)max_poll_ms_,
+                 (unsigned long)max_fresh_interval_ms_);
         }
         return;
     }

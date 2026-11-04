@@ -37,6 +37,8 @@ private:
     int           enc_l_sum_ {0};
     int           enc_r_sum_ {0};
     std::uint32_t max_poll_ms_ {0};
+    std::uint32_t max_fresh_interval_ms_ {0};
+    bool have_fresh_sample_ {false};
 
     // Stale-data shutdown
     std::uint32_t last_fresh_ms_ {0};
