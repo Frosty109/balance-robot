@@ -30,6 +30,7 @@ FetchContent_Declare(
     URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
 )
 FetchContent_MakeAvailable(googletest)
+add_subdirectory(ros2/src/balance_car_core)
 
 add_executable(balance_tests
     src/pid/pid_control.cpp
