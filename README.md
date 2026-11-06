@@ -27,8 +27,6 @@ As of **6 November 2026**:
   timestamps. Proximity stopping has not been implemented yet.
 - The ROS-independent C++ core parses RANGE messages and explicit state events, and frames
   serial input with a bounded line buffer that recovers after overlong lines.
-- The latest complete Windows host test run passed **141/141 tests**. These cover control
-  logic, command handling, serial framing and parsing; they do not replace physical testing.
 
 Residual creep, fore/aft cycling, hesitation and weak turn-rate tracking remain. Battery
 measurement and cutoff, intermittent serial startup and other hardware questions are still
