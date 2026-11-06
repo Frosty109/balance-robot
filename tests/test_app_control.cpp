@@ -826,8 +826,8 @@ TEST(AppControlTest, MaxPollDurationIsRecorded)
 
     const std::string output = testing::internal::GetCapturedStdout();
 
-    EXPECT_NE(output.find("poll=30\n"), std::string::npos);
-    EXPECT_EQ(output.find("poll=1\n"), std::string::npos);   // max, not last
+    EXPECT_NE(output.find(" poll=30 "), std::string::npos);
+    EXPECT_EQ(output.find(" poll=1 "), std::string::npos);   // max, not last
 }
 
 TEST(AppControlTest, StaleEntryPrintsOnce)
