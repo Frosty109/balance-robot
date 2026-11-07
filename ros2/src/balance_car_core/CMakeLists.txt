@@ -4,6 +4,7 @@ project(balance_car_core VERSION 0.1.0 LANGUAGES CXX)
 add_library(balance_car_core
     src/telemetry.cpp
     src/state_events.cpp
+    src/health_telemetry.cpp
 )
 add_library(balance_car_core::balance_car_core ALIAS balance_car_core)
 
@@ -26,6 +27,7 @@ if(BALANCE_CAR_CORE_BUILD_TESTS)
         test/test_telemetry.cpp
         test/test_line_buffer.cpp
         test/test_state_events.cpp
+        test/test_health_telemetry.cpp
     )
     target_link_libraries(balance_car_core_tests PRIVATE
         balance_car_core::balance_car_core
@@ -35,3 +37,16 @@ if(BALANCE_CAR_CORE_BUILD_TESTS)
     include(GoogleTest)
     gtest_discover_tests(balance_car_core_tests DISCOVERY_MODE PRE_TEST)
 endif()
+
+install(TARGETS balance_car_core
+    EXPORT balance_car_coreTargets
+    ARCHIVE DESTINATION lib
+)
+
+install(DIRECTORY include/ DESTINATION include)
+
+install(EXPORT balance_car_coreTargets
+    FILE balance_car_coreConfig.cmake
+    NAMESPACE balance_car_core::
+    DESTINATION lib/cmake/balance_car_core
+)

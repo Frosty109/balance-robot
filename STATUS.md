@@ -3,7 +3,7 @@
 Where the project stands, with the evidence for each claim. Reconciled by the `status` skill;
 `AGENTS.md` holds the standing rules and does not repeat what is here.
 
-Last updated: 2026-11-01.
+Last updated: 2026-11-07.
 
 ## Now
 
@@ -12,18 +12,75 @@ retained for supervised development after the 2026-10-24 holds, small-push recov
 direction-reversal and turn captures. Residual creep, cycling, hesitation and weak turn-rate
 tracking remain. Stage 10 is still open. Battery cutoff remains off.
 
-**Next: ROS 2 integration on the Q6A, starting with read-only range/state topics.**
+**Next: a small read-only ROS 2 range bridge on the Q6A. Core parsers are complete.**
 The operator agreed on 2026-11-01 to bring ROS forward and build proximity stopping as ROS
 nodes, replacing the earlier non-ROS-demo-first order. The updated
-`plans/2026-09-09-sbc-integration-and-avoidance.md` is **ready-to-implement**: publish existing
+`plans/2026-09-09-sbc-integration-and-avoidance.md` is **in-progress**: publish existing
 serial telemetry while disarmed, verify the armed RANGE source change, add bounded command/arm/run
 handling, then demonstrate a supervised proximity stop. Revised after review the same day, it now
 holds the serial line grammar the bridge parses (§4.1), a replay adapter for drive.py logs, a
 no-reset-on-open check, a predicted armed dtmax of about 17-19 ms from blocking prints (inference,
 not measured), and a hold-to-run lease renewed by operator keystrokes so a Wi-Fi stall cannot keep
-a run alive. ROS is not yet verified installed; no ROS workspace exists. Jazzy targets the Q6A's
-Ubuntu 24.04 ARM64 platform; node language (Python or C++) is undecided. No further long
-static-distance capture is required to begin read-only integration.
+a run alive. ROS Jazzy is installed on the Q6A (SSH-verified 2026-11-07). The repository has a `ros2/`
+workspace skeleton containing the plain-CMake core; no ROS nodes exist yet. Jazzy targets the Q6A's
+Ubuntu 24.04 ARM64 platform. Language decided 2026-11-04: C++ (`rclcpp`) for the bridge,
+operator lease and proximity policy, over a ROS-independent core testable on the PC; Python for
+tooling only. The operator guides-and-types the code; Q6A was unreachable over SSH on 2026-11-04.
+No further long static-distance capture is required to begin read-only integration.
+On 2026-11-07 the operator agreed to start with `/car/range` and diagnostic health/state logs,
+deferring full current-state tracking and capture replay until command support. They are not
+prerequisites for first read-only output. An initial SSH check of `q6a` (192.168.32.165:22)
+timed out on 2026-11-07; retry after the operator powered the Q6A succeeded. Verified Ubuntu
+24.04.4/aarch64 and UTF-8 locale. The operator installed ROS Jazzy Base and development tools:
+SSH confirms `ROS_DISTRO=jazzy`, `rclcpp` under `/opt/ros/jazzy`, `/usr/bin/colcon`, GCC 13.3.0
+and CMake 3.28.3. After explicit operator approval, the 13-file core package was copied to
+`~/balance-car/ros2/src/balance_car_core` on the Q6A. Its standalone Ninja build passed with
+GCC 13.3.0 and system GoogleTest 1.14.0; **52/52 core tests passed**, zero failures, in **0.29 s**.
+Evidence: `sessions/artefacts/2026-11-07/q6a-core-ctest-lasttest.log`. This is the core suite,
+not the full Windows 148-test suite. Core install/export rules are now saved and synced:
+colcon build/install passed, colcon reports 52 tests with zero failures, and CMake package
+discovery reports `balance_car_core found`. The colcon CTest run emits a non-fatal missing
+`DartConfiguration.tcl` warning. Evidence:
+`sessions/artefacts/2026-11-07/q6a-core-colcon-test.log`. Next: range interface and read-only bridge.
+No serial port was opened; live ROS publication remains pending.
+
+**First core slice complete, committed as `e56ba10` (2026-11-06).**
+`ros2/src/balance_car_core/` contains package metadata, a C++23 `parse_range()` implementation
+and 12 parser tests. It is independent of ROS and firmware HAL and is wired into the root
+host build. After correcting the older poll-duration test's obsolete end-of-line assumption
+for the trailing `dtmax` field, the full host suite passed **108/108**, zero failures, in
+**1.66 s** by the operator's terminal summary; the saved CTest log confirms all 108 passed.
+Evidence: `sessions/artefacts/2026-11-06/host-ctest-summary-pasted.txt` and
+`sessions/artefacts/2026-11-06/host-ctest-lasttest.log`.
+
+**Bounded line buffer complete (2026-11-06), committed as `aa4c1a9`.** User-authored
+`line_buffer.hpp`, `test_line_buffer.cpp` and package CMake wiring match the reviewed proposal
+in `plans/2026-11-06-bounded-serial-line-buffer.md` (done). Its 16 tests cover fragmented and
+coalesced lines, LF/CRLF capacity boundaries, overflow/discard resynchronisation, reset and
+delivery to the RANGE parser. The integrated Windows host suite passed **124/124**, zero
+failures, in **2.00 s** by the operator's summary, confirmed by the saved full CTest log:
+`sessions/artefacts/2026-11-06/host-ctest-line-buffer-summary-pasted.txt` and
+`sessions/artefacts/2026-11-06/host-ctest-line-buffer-lasttest.log`.
+
+**Explicit state-event parsing complete (2026-11-06), committed as `aa4c1a9`.** User-authored
+`state_events.hpp`, `state_events.cpp` and `test_state_events.cpp` match the reviewed proposal
+in `plans/2026-11-06-state-event-parsing.md` (done); library/test CMake entries are present.
+The parser decodes BOOT, ARMED, DISARMED, ARM REJECTED, FAULT, RECOVERED and STALE as owned
+event values, without maintaining current robot state. All 17 new tests passed, and the full
+Windows host suite passed **141/141**, zero failures, in **2.07 s** by the operator's summary,
+confirmed by the saved CTest log: `sessions/artefacts/2026-11-06/host-ctest-state-events-summary-pasted.txt`
+and `sessions/artefacts/2026-11-06/host-ctest-state-events-lasttest.log`.
+**Periodic health-row parsing complete (2026-11-07).** The user authored
+`health_telemetry.hpp`, `health_telemetry.cpp`, seven consolidated tests and package CMake
+entries matching `plans/2026-11-07-health-row-parsing.md` (done). The agent added the missing
+final test brace at the user's request. The parser preserves wire units and distinguishes
+armed/disarmed layouts without granting arm permission. The full Windows host build and CTest
+passed **148/148**, zero failures, in **1.93 s**; archived log:
+`sessions/artefacts/2026-11-07/host-ctest-health-telemetry-lasttest.log`.
+Next: add the range interface and publish range read-only while disarmed.
+Serial transport, live ROS publication and proximity
+stopping are not implemented. The package licence remains `TODO`; core install/export rules
+are verified on the Q6A. No firmware build, flash or hardware run occurred today.
 
 **Forward roadmap:** `plans/2026-11-01-feature-roadmap.md` (in-progress) sequences what follows:
 camera, expression display, odometry and bounded moves, a read-only LLM, a model router across
@@ -32,8 +89,10 @@ reporting dashboard. No display or LiDAR is owned yet. Stage 10 and historical m
 remain open.
 
 **Project review 2026-11-01:** `reviews/2026-11-01-project-review-findings.md`. Findings bearing on
-status, none yet acted on: the running image was built from an uncommitted tree; both build trees
-have an empty `CMAKE_BUILD_TYPE`, so firmware is -O0 without `-g` (all timing evidence is at -O0);
+status: source checkpointing has since been completed (`625a6af`, `b07fde6`, `e56ba10`, `aa4c1a9`),
+but that does not establish the exact running image. The recorded image was built from an
+uncommitted tree; both build trees have an empty `CMAKE_BUILD_TYPE`, so firmware is -O0
+without `-g` (all timing evidence is at -O0);
 the IMU self-test bias branch never runs on an MPU6050 (result mask at most `0x3`, code tests
 `0x7`), so no boot bias is loaded; the 9.6 V cutoff remnants are a 3S value on this 2S car; the
 simulator is unrepresentative.
@@ -42,12 +101,13 @@ simulator is unrepresentative.
 BSP/HAL and CMake/main integration is committed as `9c2554f`. PA0 triggers, PA1/TIM5_CH2 captures
 echo, internal TIM5_CH3 provides a 30 ms deadline, with attempts at least 100 ms apart. TIM2 clock,
 TIM3/4 encoders and TIM8 PWM are unchanged. Main services range after `app.update()`; sensing
-does not command motion. The flashed diagnostic image prints RANGE only while disarmed;
-acquisition continues while armed. Current source now uses `if (range_sensor.poll())`, enabling
-printing in both states. On 2026-11-04 the operator reported armed RANGE printing as fine; no
-capture or armed dtmax was saved, so the predicted armed load remains unmeasured. Completion timestamps
-retain conservative acquisition timing; capture errors use attempt start. Uncommitted `dtmax`
-tracks maximum successive fresh IMU
+does not command motion. The saved 2026-11-01 diagnostic captures cover disarmed RANGE printing;
+acquisition continues while armed. Source committed as `625a6af` uses
+`if (range_sensor.poll())`, enabling printing in both states. On 2026-11-04 the operator reported
+armed RANGE printing as fine; no capture or armed dtmax was saved, so the predicted armed load
+remains unmeasured. Completion timestamps
+retain conservative acquisition timing; capture errors use attempt start. The `dtmax` diagnostic,
+also committed in `625a6af`, tracks maximum successive fresh IMU
 poll-completion intervals, skips the first sample, persists across faults/arm/disarm and prints
 in disarmed telemetry. It includes intervening range/serial work; `poll` remains IMU-poll-only.
 
@@ -56,7 +116,7 @@ in disarmed telemetry. It includes intervening range/serial work; `poll` remains
 - `sessions/artefacts/2026-11-01/range-dtmax-flash-pasted.txt`: operator's Q6A programmer excerpt
   verifies 52656 bytes and reset through the existing remote helper. Agent firmware build passed;
   ELF text/data/bss **52516/140/2548 bytes**, binary **52656 bytes**. Existing syscall-stub linker
-  warnings remain. No new full host suite was run; latest saved result remains 96/96 on 2026-10-30.
+  warnings remain. No full host suite was run that day; the saved result then was 96/96 on 2026-10-30.
 - `sessions/artefacts/2026-11-01/range-dtmax-01-pasted.txt`: BOOT/IMU/MOTOR, CONFIG limit 2000,
   boot DISARMED; about 6 s of running telemetry, max poll 4 ms/dtmax 9 ms. One initial capture_error
   is followed by 60 valid results; ages 0-4 ms. This is a pasted terminal capture.
@@ -103,7 +163,7 @@ voltage compliance.
 **C++23 build/test validation completed 2026-10-30; hardware smoke passed by operator report.**
 `CMakeLists.txt` sets 23; generated host and firmware Ninja files contain `-std=gnu++23`.
 Windows host and Ubuntu 24.04 Docker each passed 96/96 tests. Firmware linked with
-text/data/bss **49140/140/2548 bytes**, identical to the pre-rebuild ELF size recorded today.
+text/data/bss **49140/140/2548 bytes**, identical to the pre-rebuild ELF size recorded that day.
 Bare-metal syscall-stub linker warnings were supplied; whether they are new was not established.
 After the transfer/flash instructions, the operator reported successful operation and supplied
 `sessions/artefacts/2026-10-30/cpp23-smoke-pasted.txt`: moving/turn-command telemetry,
@@ -116,7 +176,8 @@ or promote limit 2000 to the earlier limit 1000 acceptance. Full runtime configu
 timing of the limit change relative to the flashed image remain to be confirmed. C++23 is now
 committed as `23aeaaf`; limit 2000 and yaw feedforward source as `3aab687`. Commit existence
 does not extend the earlier control acceptance. The subsequent range checkpoint is `9c2554f`;
-range telemetry, fresh-interval diagnostic and the earlier yaw-test diff remain uncommitted.
+range telemetry and the fresh-interval diagnostic are now committed as `625a6af`, and the
+additional yaw tests as `b07fde6`. These source checkpoints do not identify a flashed image.
 
 **Radxa Dragon Q6A stack mounted 2026-10-17:** about +360 g on a ~1 kg car (Q6A/heatsink
 179 g, power bank/cable 164 g, standoffs). With corrected motor plugs it balanced on the earlier
@@ -130,7 +191,7 @@ labelled `*-pasted.txt` where supplied as terminal excerpts rather than complete
 
 **Local flash-helper copy is damaged (2026-11-01).** `tools/flash.sh` is 52584 bytes of firmware
 binary data, not a shell script; how it was overwritten is unknown. Do not upload it over the
-working Q6A helper. The Q6A copy successfully flashed/verified 52656 bytes today. Recover and
+working Q6A helper. The Q6A copy successfully flashed/verified 52656 bytes on 2026-11-01. Recover and
 review the local script from that working copy or a verified backup before future helper
 transfers; the documented direct `stm32flash` command remains an alternative. The firmware
 binary and full diagnostic log transfers succeeded. No local helper repair was performed.
@@ -181,7 +242,7 @@ evidence summary above.
 
 Historical comparison: 2026-10-21 limit 400 saturated windows averaged 91/97 mm/s backward;
 limit 800 settled saturated windows averaged 27/25 (`i=800` throughout). Those selected windows
-and today's whole holds are different statistics, not a controlled percentage-improvement claim.
+and the 2026-10-24 whole holds are different statistics, not a controlled percentage-improvement claim.
 Evidence: `devlog/artefacts/2026-10-21-rollback-limit-{400,800}-pasted.txt`.
 Earlier midpoint 1.0/2.0 trials worsened roll; balance ×1.4/midpoint −1 oscillated; single
 balance-gain trials varied strongly (`devlog/artefacts/2026-10-17-q6a-bench2.txt`). Mixed floor/lift
@@ -212,10 +273,10 @@ below cap 100, `poll=4`, acknowledged operator disarm, no armed fault/reboot. Ev
 `devlog/artefacts/2026-10-24-yaw-ff1-left10-pasted.txt`. F6/F7 direction now demonstrated;
 F8 left-curve evidence improved. Failure-path regression on this image remains open.
 
-**Motion acceptance remains separate from ROS bring-up.** Today's 52656-byte programming
+**Motion acceptance remains separate from ROS bring-up.** The 2026-11-01 52656-byte programming
 verification and BOOT/config/dtmax capture establish the new range diagnostic image running
 with integral limit 2000; every gain is not printed at runtime. The 2026-10-30 smoke excerpt and
-today's disarmed captures do not close the combined forward/right, return-to-zero or remaining
+the 2026-11-01 disarmed captures do not close the combined forward/right, return-to-zero or remaining
 F9 rows. Repeat F2/F5 was deliberately deferred on 2026-10-26; optional physical cable pull
 still needs a run/defer decision. Dropped-SSH-session disarm remains hardware-unverified.
 Keep control settings fixed. Add command expiry, operator-loss and stop-path checks with the
@@ -237,13 +298,15 @@ link, `mid_angle=0`, `DEADZONE=1300`. User reported build/flash; supplied progra
 verifies a 49,280-byte binary followed by running turn telemetry. `i` reaches 1000 and `tr`
 is consistent with ff=1. On 2026-10-26 a boot banner directly confirmed limit 1000, but not every
 gain. Current source instead sets limit 2000, as qualified above; the boot print shares that
-constant with the constructor. Control settings introduced in `3aab687` are unchanged in HEAD
-`9c2554f`: balance `(12240,94,0)`, velocity `(7000,35,2000)`, yaw `(1,30,100,1)`. A yaw-test diff,
-range telemetry (now also enabled while armed in source) and the fresh-interval diagnostic
-remain uncommitted. Historical Stage 11 remains closed at the earlier `076b4a6`
-configuration, not the larger current limit. Battery cutoff off; `FAULT_INJECT` absent. Governor unchanged:
-±100 mm/s, ±30 deg/s, 200 mm/s², 60 deg/s², 250 ms. Latest full host build/CTest **96/96 passed
-(2026-10-30)**; not rerun on 2026-11-01. Latest firmware build passed today, ELF text/data/bss
+constant with the constructor. Current source retains the control settings introduced in
+`3aab687`: balance `(12240,94,0)`, velocity `(7000,35,2000)`, yaw `(1,30,100,1)`.
+Range telemetry (also enabled while armed in source) and the fresh-interval diagnostic are
+committed as `625a6af`; additional yaw tests as `b07fde6`. Historical Stage 11 remains closed
+at the earlier `076b4a6` configuration, not the larger current limit. Battery cutoff off;
+`FAULT_INJECT` absent. Governor unchanged:
+±100 mm/s, ±30 deg/s, 200 mm/s², 60 deg/s², 250 ms. Latest full Windows host build/CTest
+**148/148 passed (2026-11-07)**; latest saved Docker suite remains 96/96 (2026-10-30).
+Latest documented firmware build passed on 2026-11-01, ELF text/data/bss
 52516/140/2548 bytes. Operator Q6A output verifies a 52656-byte write and reset; the subsequent
 BOOT/config/dtmax capture confirms the diagnostic runs with limit 2000. No readback hash or
 full runtime gain banner was supplied. The historical 49280-byte and 52584-byte programming
@@ -253,6 +316,10 @@ images are superseded for current diagnostic work; binary lengths are not ELF te
 
 | Milestone | Where | Evidence |
 |---|---|---|
+| Periodic health-row parser and host integration; 148/148 host tests | 2026-11-07; host tests only | `plans/2026-11-07-health-row-parsing.md` and its archived host CTest log |
+| Explicit state-event parser and host integration; 141/141 host tests | 2026-11-06, `aa4c1a9`; PC tests only | `plans/2026-11-06-state-event-parsing.md` and its cited host CTest artefacts |
+| Bounded line buffer and host integration; 124/124 host tests | 2026-11-06, `aa4c1a9`; PC tests only | `plans/2026-11-06-bounded-serial-line-buffer.md` and its cited host CTest artefacts |
+| ROS-independent RANGE parser and host integration; 108/108 host tests | 2026-11-06, `e56ba10`; first core slice only | `sessions/2026-11-06.md` and its saved host CTest artefacts |
 | C++23 build/test validation and reported hardware smoke | 2026-10-30, `23aeaaf`; hardware comparison qualified by limit 2000 source | `sessions/2026-10-30.md` |
 | Fresh-packet-gated control | `fa6eb90` | |
 | 1 kHz TIM2 monotonic clock behind `IMonotonicClock`; rate measured at 1.001 | `1bd5bb4` | |
