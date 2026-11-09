@@ -1,0 +1,29 @@
+cmake_minimum_required(VERSION 3.20)
+project(balance_car_bridge LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+find_package(ament_cmake REQUIRED)
+find_package(balance_car_core REQUIRED)
+find_package(balance_car_interfaces REQUIRED)
+find_package(builtin_interfaces REQUIRED)
+
+add_library(range_mapping STATIC src/range_mapping.cpp)
+target_include_directories(range_mapping PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
+# A missed RangeStatus case must fail the build, not slip through as a warning.
+target_compile_options(range_mapping PRIVATE -Wall -Wextra -Werror=switch)
+target_link_libraries(range_mapping PUBLIC
+  balance_car_core::balance_car_core
+  ${balance_car_interfaces_TARGETS}
+  ${builtin_interfaces_TARGETS})
+
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+  ament_add_gtest(test_range_mapping test/test_range_mapping.cpp)
+  target_link_libraries(test_range_mapping range_mapping)
+endif()
+
+ament_package()

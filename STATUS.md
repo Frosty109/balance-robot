@@ -3,7 +3,7 @@
 Where the project stands, with the evidence for each claim. Reconciled by the `status` skill;
 `AGENTS.md` holds the standing rules and does not repeat what is here.
 
-Last updated: 2026-11-07.
+Last updated: 2026-11-09.
 
 ## Now
 
@@ -21,8 +21,8 @@ handling, then demonstrate a supervised proximity stop. Revised after review the
 holds the serial line grammar the bridge parses (§4.1), a replay adapter for drive.py logs, a
 no-reset-on-open check, a predicted armed dtmax of about 17-19 ms from blocking prints (inference,
 not measured), and a hold-to-run lease renewed by operator keystrokes so a Wi-Fi stall cannot keep
-a run alive. ROS Jazzy is installed on the Q6A (SSH-verified 2026-11-07). The repository has a `ros2/`
-workspace skeleton containing the plain-CMake core; no ROS nodes exist yet. Jazzy targets the Q6A's
+a run alive. ROS Jazzy is installed on the Q6A (SSH-verified 2026-11-07). The `ros2/` workspace holds the
+plain-CMake core plus the new interface and bridge packages below; no ROS nodes exist yet. Jazzy targets the Q6A's
 Ubuntu 24.04 ARM64 platform. Language decided 2026-11-04: C++ (`rclcpp`) for the bridge,
 operator lease and proximity policy, over a ROS-independent core testable on the PC; Python for
 tooling only. The operator guides-and-types the code; Q6A was unreachable over SSH on 2026-11-04.
@@ -41,8 +41,17 @@ not the full Windows 148-test suite. Core install/export rules are now saved and
 colcon build/install passed, colcon reports 52 tests with zero failures, and CMake package
 discovery reports `balance_car_core found`. The colcon CTest run emits a non-fatal missing
 `DartConfiguration.tcl` warning. Evidence:
-`sessions/artefacts/2026-11-07/q6a-core-colcon-test.log`. Next: range interface and read-only bridge.
-No serial port was opened; live ROS publication remains pending.
+`sessions/artefacts/2026-11-07/q6a-core-colcon-test.log`.
+
+**Bridge started 2026-11-09 (user-authored, uncommitted).** `ros2/src/balance_car_interfaces/`
+defines `RangeReading.msg`: receipt-time `Header`, explicit `STATUS_*` constants, uint32
+sequence/completed_ms/distance_mm/reported_age_ms in wire units, no boot epoch. Q6A colcon build
+and `ros2 interface show` passed (`sessions/artefacts/2026-11-09/q6a-interfaces-build-pasted.txt`).
+`ros2/src/balance_car_bridge/` holds only `to_msg()` (core reading to message, exhaustive
+status `switch`) and two gtests; the bridge XML reports **2 tests, 0 failures** on the Q6A
+(`sessions/artefacts/2026-11-09/q6a-bridge-mapping-test-pasted.txt`). A test-file
+explicit-constructor warning at line 47 is unfixed. Next: serial reader, then the rclcpp node.
+No serial port was opened; no ROS node exists; live publication remains pending.
 
 **First core slice complete, committed as `e56ba10` (2026-11-06).**
 `ros2/src/balance_car_core/` contains package metadata, a C++23 `parse_range()` implementation
@@ -70,14 +79,13 @@ event values, without maintaining current robot state. All 17 new tests passed, 
 Windows host suite passed **141/141**, zero failures, in **2.07 s** by the operator's summary,
 confirmed by the saved CTest log: `sessions/artefacts/2026-11-06/host-ctest-state-events-summary-pasted.txt`
 and `sessions/artefacts/2026-11-06/host-ctest-state-events-lasttest.log`.
-**Periodic health-row parsing complete (2026-11-07).** The user authored
+**Periodic health-row parsing complete (2026-11-07), committed and pushed as `d86a947`.** The user authored
 `health_telemetry.hpp`, `health_telemetry.cpp`, seven consolidated tests and package CMake
 entries matching `plans/2026-11-07-health-row-parsing.md` (done). The agent added the missing
 final test brace at the user's request. The parser preserves wire units and distinguishes
 armed/disarmed layouts without granting arm permission. The full Windows host build and CTest
 passed **148/148**, zero failures, in **1.93 s**; archived log:
 `sessions/artefacts/2026-11-07/host-ctest-health-telemetry-lasttest.log`.
-Next: add the range interface and publish range read-only while disarmed.
 Serial transport, live ROS publication and proximity
 stopping are not implemented. The package licence remains `TODO`; core install/export rules
 are verified on the Q6A. No firmware build, flash or hardware run occurred today.
@@ -316,7 +324,7 @@ images are superseded for current diagnostic work; binary lengths are not ELF te
 
 | Milestone | Where | Evidence |
 |---|---|---|
-| Periodic health-row parser and host integration; 148/148 host tests | 2026-11-07; host tests only | `plans/2026-11-07-health-row-parsing.md` and its archived host CTest log |
+| Periodic health-row parser and host integration; 148/148 host tests | 2026-11-07, `d86a947`; host tests only | `plans/2026-11-07-health-row-parsing.md` and its archived host CTest log |
 | Explicit state-event parser and host integration; 141/141 host tests | 2026-11-06, `aa4c1a9`; PC tests only | `plans/2026-11-06-state-event-parsing.md` and its cited host CTest artefacts |
 | Bounded line buffer and host integration; 124/124 host tests | 2026-11-06, `aa4c1a9`; PC tests only | `plans/2026-11-06-bounded-serial-line-buffer.md` and its cited host CTest artefacts |
 | ROS-independent RANGE parser and host integration; 108/108 host tests | 2026-11-06, `e56ba10`; first core slice only | `sessions/2026-11-06.md` and its saved host CTest artefacts |
