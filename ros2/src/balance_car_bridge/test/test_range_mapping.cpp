@@ -44,7 +44,7 @@ TEST(RangeMapping, MapsEveryStatusExplicitly)
     {
         RangeReading reading;
         reading.status = status;
-        EXPECT_EQ(to_msg(reading, {}, "").status, expected)
+        EXPECT_EQ(to_msg(reading, builtin_interfaces::msg::Time {}, "").status, expected)
             << "core status " << static_cast<int>(status);
     }
 }

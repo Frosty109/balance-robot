@@ -43,7 +43,7 @@ discovery reports `balance_car_core found`. The colcon CTest run emits a non-fat
 `DartConfiguration.tcl` warning. Evidence:
 `sessions/artefacts/2026-11-07/q6a-core-colcon-test.log`.
 
-**Bridge started 2026-11-09 (user-authored, uncommitted).** `ros2/src/balance_car_interfaces/`
+**Bridge started 2026-11-09 (user-authored, committed as `9010723`, pushed 2026-11-13).** `ros2/src/balance_car_interfaces/`
 defines `RangeReading.msg`: receipt-time `Header`, explicit `STATUS_*` constants, uint32
 sequence/completed_ms/distance_mm/reported_age_ms in wire units, no boot epoch. Q6A colcon build
 and `ros2 interface show` passed (`sessions/artefacts/2026-11-09/q6a-interfaces-build-pasted.txt`).
