@@ -9,6 +9,7 @@ find_package(ament_cmake REQUIRED)
 find_package(balance_car_core REQUIRED)
 find_package(balance_car_interfaces REQUIRED)
 find_package(builtin_interfaces REQUIRED)
+find_package(rclcpp REQUIRED)
 
 add_library(range_mapping STATIC src/range_mapping.cpp)
 target_include_directories(range_mapping PUBLIC
@@ -24,6 +25,11 @@ add_library(serial_link STATIC src/serial_link.cpp)
 target_include_directories(serial_link PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
 target_compile_options(serial_link PRIVATE -Wall -Wextra)
+
+add_executable(range_bridge src/bridge_node.cpp)
+target_compile_options(range_bridge PRIVATE -Wall -Wextra)
+target_link_libraries(range_bridge serial_link range_mapping rclcpp::rclcpp)
+install(TARGETS range_bridge DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)

@@ -12,6 +12,7 @@
   <depend>balance_car_core</depend>
   <depend>balance_car_interfaces</depend>
   <depend>builtin_interfaces</depend>
+  <depend>rclcpp</depend>
 
   <test_depend>ament_cmake_gtest</test_depend>
 
