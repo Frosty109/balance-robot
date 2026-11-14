@@ -20,10 +20,18 @@ target_link_libraries(range_mapping PUBLIC
   ${balance_car_interfaces_TARGETS}
   ${builtin_interfaces_TARGETS})
 
+add_library(serial_link STATIC src/serial_link.cpp)
+target_include_directories(serial_link PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
+target_compile_options(serial_link PRIVATE -Wall -Wextra)
+
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
   ament_add_gtest(test_range_mapping test/test_range_mapping.cpp)
   target_link_libraries(test_range_mapping range_mapping)
+
+  ament_add_gtest(test_serial_link test/test_serial_link.cpp)
+  target_link_libraries(test_serial_link serial_link)
 endif()
 
 ament_package()

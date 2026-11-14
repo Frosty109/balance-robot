@@ -13,9 +13,16 @@ namespace balance_car::bridge
 class SerialLink
 {
 public:
-    // Read-only by constructionthe car.
+    // Pseudo-terminals in tests have no modem lines, so they need leave.
+    enum class ControlLines
+    {
+        set_run_levels,
+        leave
+    };
+
+    // Read-only by construction: nothing in this class can send bytes to the car.
     [[nodiscard]] static std::expected<SerialLink, std::error_code>
-    open_read_only(const std::string& path);
+    open_read_only(const std::string& path, ControlLines lines = ControlLines::set_run_levels);
 
     SerialLink(SerialLink&& other) noexcept;
     SerialLink& operator=(SerialLink&& other) noexcept;
@@ -23,7 +30,7 @@ public:
     SerialLink& operator=(const SerialLink&) = delete;
     ~SerialLink();
 
-    // Bytes read, or 0 when nothing is waiting
+    // Bytes read, or 0 when nothing is waiting; an error if the port failed or hung up.
     [[nodiscard]] std::expected<std::size_t, std::error_code>
     read_some(std::span<char> buffer) noexcept;
 
