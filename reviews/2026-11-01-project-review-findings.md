@@ -1,7 +1,7 @@
 # Review Findings: Whole-Project Review
 
 Date: 2026-11-01
-Reviewed: project-owned source at HEAD `9c2554f` plus working-tree edits (`src/`, `hal/`, `bsp/`,
+Reviewed: project-owned source at HEAD `e06e2de` plus working-tree edits (`src/`, `hal/`, `bsp/`,
 `stm32/USER/`, both CMake files and the toolchain file, `tests/`, `simulation/`, `hal/sim/`), vendor
 I2C/IMU code where project code depends on it, and repo hygiene (`.gitignore`, `ISSUES.md`,
 `tools/`, Docker files). The ROS integration plan was reviewed separately the same day and

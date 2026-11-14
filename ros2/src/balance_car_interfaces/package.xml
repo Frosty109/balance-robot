@@ -5,7 +5,7 @@
   <version>0.1.0</version>
   <description>ROS 2 message definitions for the balance car bridge.</description>
   <maintainer email="123444485+Frosty109@users.noreply.github.com">Ben</maintainer>
-  <license>TODO</license>
+  <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
   <buildtool_depend>rosidl_default_generators</buildtool_depend>

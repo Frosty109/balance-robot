@@ -130,7 +130,7 @@ Plans updated: `plans/2026-08-16-balance-bring-up.md` (Stage 7 integral limit, l
   (startup purge) and 8 (stale) were skipped by decision and remain unobserved on hardware.
 
 - [x] **⭐ Encoder backlog defeats the angle-fault integral reset** — **CLOSED 2026-09-18** in
-  `6cad87d`; verified n = 3, `devlog/artefacts/2026-09-18-backlog-drain-verification.txt`. — `src/app/app_control.cpp:77`
+  `04eaa4b`; verified n = 3, `devlog/artefacts/2026-09-18-backlog-drain-verification.txt`. — `src/app/app_control.cpp:77`
   returns before the encoder reads at `:105-106`, so `TIM->CNT` accumulates unread for the
   whole fault. On the first non-faulted sample one read returns the entire backlog and
   `encoder_integral_` is driven straight back to its clamp — to the same rail it held before
@@ -170,7 +170,7 @@ Plans updated: `plans/2026-08-16-balance-bring-up.md` (Stage 7 integral limit, l
   `enc_r` feeds the velocity loop, so any directional bias in the counts becomes a directional
   controller bias. Cause open: motors, gearboxes, H-bridges, brush geometry, friction and
   backlash can all behave asymmetrically by direction, so this does not point at the counting.
-  (It is not `42ce5c6` — negating the right count cannot produce a 20% magnitude error.) Test:
+  (It is not `c8cec91` — negating the right count cannot produce a 20% magnitude error.) Test:
   mark both wheels, drive at fixed PWM for fixed time each way, compare revolutions against
   counts — wheels differing points at the drivetrain, counts differing at the encoder path.
 

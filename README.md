@@ -196,6 +196,6 @@ and experiments with voice and model-assisted behaviour. These are future direct
 
 ## Project licence
 
-The repository does not currently include a project-wide licence file. The ROS core package
-still has a `TODO` licence entry. Retained third-party sources carry their existing notices;
-a project licence has not been selected as part of this work.
+The project's own code is released under the MIT licence (`LICENSE`). Retained third-party
+sources, such as the ST peripheral library, CMSIS, the InvenSense motion driver and the
+Yahboom-derived C drivers, keep their own notices; see `THIRD_PARTY_NOTICES.md`.

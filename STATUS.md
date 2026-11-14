@@ -29,7 +29,7 @@ tooling only. The operator guides-and-types the code; Q6A was unreachable over S
 No further long static-distance capture is required to begin read-only integration.
 On 2026-11-07 the operator agreed to start with `/car/range` and diagnostic health/state logs,
 deferring full current-state tracking and capture replay until command support. They are not
-prerequisites for first read-only output. An initial SSH check of `q6a` (<q6a-lan-ip>:22)
+prerequisites for first read-only output. An initial SSH check of the Q6A (`q6a`, LAN port 22)
 timed out on 2026-11-07; retry after the operator powered the Q6A succeeded. Verified Ubuntu
 24.04.4/aarch64 and UTF-8 locale. The operator installed ROS Jazzy Base and development tools:
 SSH confirms `ROS_DISTRO=jazzy`, `rclcpp` under `/opt/ros/jazzy`, `/usr/bin/colcon`, GCC 13.3.0
@@ -43,7 +43,7 @@ discovery reports `balance_car_core found`. The colcon CTest run emits a non-fat
 `DartConfiguration.tcl` warning. Evidence:
 `sessions/artefacts/2026-11-07/q6a-core-colcon-test.log`.
 
-**Bridge started 2026-11-09 (user-authored, committed as `9010723`, pushed 2026-11-13).** `ros2/src/balance_car_interfaces/`
+**Bridge started 2026-11-09 (user-authored, committed as `372fa73`, pushed 2026-11-13).** `ros2/src/balance_car_interfaces/`
 defines `RangeReading.msg`: receipt-time `Header`, explicit `STATUS_*` constants, uint32
 sequence/completed_ms/distance_mm/reported_age_ms in wire units, no boot epoch. Q6A colcon build
 and `ros2 interface show` passed (`sessions/artefacts/2026-11-09/q6a-interfaces-build-pasted.txt`).
@@ -53,7 +53,7 @@ status `switch`) and two gtests; the bridge XML reports **2 tests, 0 failures** 
 explicit-constructor warning at line 47 is unfixed. Next: serial reader, then the rclcpp node.
 No serial port was opened; no ROS node exists; live publication remains pending.
 
-**First core slice complete, committed as `e56ba10` (2026-11-06).**
+**First core slice complete, committed as `5621495` (2026-11-06).**
 `ros2/src/balance_car_core/` contains package metadata, a C++23 `parse_range()` implementation
 and 12 parser tests. It is independent of ROS and firmware HAL and is wired into the root
 host build. After correcting the older poll-duration test's obsolete end-of-line assumption
@@ -62,7 +62,7 @@ for the trailing `dtmax` field, the full host suite passed **108/108**, zero fai
 Evidence: `sessions/artefacts/2026-11-06/host-ctest-summary-pasted.txt` and
 `sessions/artefacts/2026-11-06/host-ctest-lasttest.log`.
 
-**Bounded line buffer complete (2026-11-06), committed as `aa4c1a9`.** User-authored
+**Bounded line buffer complete (2026-11-06), committed as `75ffffa`.** User-authored
 `line_buffer.hpp`, `test_line_buffer.cpp` and package CMake wiring match the reviewed proposal
 in `plans/2026-11-06-bounded-serial-line-buffer.md` (done). Its 16 tests cover fragmented and
 coalesced lines, LF/CRLF capacity boundaries, overflow/discard resynchronisation, reset and
@@ -71,7 +71,7 @@ failures, in **2.00 s** by the operator's summary, confirmed by the saved full C
 `sessions/artefacts/2026-11-06/host-ctest-line-buffer-summary-pasted.txt` and
 `sessions/artefacts/2026-11-06/host-ctest-line-buffer-lasttest.log`.
 
-**Explicit state-event parsing complete (2026-11-06), committed as `aa4c1a9`.** User-authored
+**Explicit state-event parsing complete (2026-11-06), committed as `75ffffa`.** User-authored
 `state_events.hpp`, `state_events.cpp` and `test_state_events.cpp` match the reviewed proposal
 in `plans/2026-11-06-state-event-parsing.md` (done); library/test CMake entries are present.
 The parser decodes BOOT, ARMED, DISARMED, ARM REJECTED, FAULT, RECOVERED and STALE as owned
@@ -79,7 +79,7 @@ event values, without maintaining current robot state. All 17 new tests passed, 
 Windows host suite passed **141/141**, zero failures, in **2.07 s** by the operator's summary,
 confirmed by the saved CTest log: `sessions/artefacts/2026-11-06/host-ctest-state-events-summary-pasted.txt`
 and `sessions/artefacts/2026-11-06/host-ctest-state-events-lasttest.log`.
-**Periodic health-row parsing complete (2026-11-07), committed and pushed as `d86a947`.** The user authored
+**Periodic health-row parsing complete (2026-11-07), committed and pushed as `886c1a6`.** The user authored
 `health_telemetry.hpp`, `health_telemetry.cpp`, seven consolidated tests and package CMake
 entries matching `plans/2026-11-07-health-row-parsing.md` (done). The agent added the missing
 final test brace at the user's request. The parser preserves wire units and distinguishes
@@ -87,7 +87,7 @@ armed/disarmed layouts without granting arm permission. The full Windows host bu
 passed **148/148**, zero failures, in **1.93 s**; archived log:
 `sessions/artefacts/2026-11-07/host-ctest-health-telemetry-lasttest.log`.
 Serial transport, live ROS publication and proximity
-stopping are not implemented. The package licence remains `TODO`; core install/export rules
+stopping are not implemented. The ROS packages are MIT-licensed (2026-11-14); core install/export rules
 are verified on the Q6A. No firmware build, flash or hardware run occurred today.
 
 **Forward roadmap:** `plans/2026-11-01-feature-roadmap.md` (in-progress) sequences what follows:
@@ -97,7 +97,7 @@ reporting dashboard. No display or LiDAR is owned yet. Stage 10 and historical m
 remain open.
 
 **Project review 2026-11-01:** `reviews/2026-11-01-project-review-findings.md`. Findings bearing on
-status: source checkpointing has since been completed (`625a6af`, `b07fde6`, `e56ba10`, `aa4c1a9`),
+status: source checkpointing has since been completed (`df5827b`, `2d5acd8`, `5621495`, `75ffffa`),
 but that does not establish the exact running image. The recorded image was built from an
 uncommitted tree; both build trees have an empty `CMAKE_BUILD_TYPE`, so firmware is -O0
 without `-g` (all timing evidence is at -O0);
@@ -106,16 +106,16 @@ the IMU self-test bias branch never runs on an MPU6050 (result mask at most `0x3
 simulator is unrepresentative.
 
 **Passive HC-SR04 acquisition works; disarmed fresh-service timing now measured.** User-authored
-BSP/HAL and CMake/main integration is committed as `9c2554f`. PA0 triggers, PA1/TIM5_CH2 captures
+BSP/HAL and CMake/main integration is committed as `e06e2de`. PA0 triggers, PA1/TIM5_CH2 captures
 echo, internal TIM5_CH3 provides a 30 ms deadline, with attempts at least 100 ms apart. TIM2 clock,
 TIM3/4 encoders and TIM8 PWM are unchanged. Main services range after `app.update()`; sensing
 does not command motion. The saved 2026-11-01 diagnostic captures cover disarmed RANGE printing;
-acquisition continues while armed. Source committed as `625a6af` uses
+acquisition continues while armed. Source committed as `df5827b` uses
 `if (range_sensor.poll())`, enabling printing in both states. On 2026-11-04 the operator reported
 armed RANGE printing as fine; no capture or armed dtmax was saved, so the predicted armed load
 remains unmeasured. Completion timestamps
 retain conservative acquisition timing; capture errors use attempt start. The `dtmax` diagnostic,
-also committed in `625a6af`, tracks maximum successive fresh IMU
+also committed in `df5827b`, tracks maximum successive fresh IMU
 poll-completion intervals, skips the first sample, persists across faults/arm/disarm and prints
 in disarmed telemetry. It includes intervening range/serial work; `poll` remains IMU-poll-only.
 
@@ -182,10 +182,10 @@ increased as confirmed by the operator on 2026-10-31**, and the
 excerpt's `i` exceeds 1000. Do not describe this as an isolated standard-only hardware comparison
 or promote limit 2000 to the earlier limit 1000 acceptance. Full runtime configuration and the
 timing of the limit change relative to the flashed image remain to be confirmed. C++23 is now
-committed as `23aeaaf`; limit 2000 and yaw feedforward source as `3aab687`. Commit existence
-does not extend the earlier control acceptance. The subsequent range checkpoint is `9c2554f`;
-range telemetry and the fresh-interval diagnostic are now committed as `625a6af`, and the
-additional yaw tests as `b07fde6`. These source checkpoints do not identify a flashed image.
+committed as `2ac728b`; limit 2000 and yaw feedforward source as `053de0d`. Commit existence
+does not extend the earlier control acceptance. The subsequent range checkpoint is `e06e2de`;
+range telemetry and the fresh-interval diagnostic are now committed as `df5827b`, and the
+additional yaw tests as `2d5acd8`. These source checkpoints do not identify a flashed image.
 
 **Radxa Dragon Q6A stack mounted 2026-10-17:** about +360 g on a ~1 kg car (Q6A/heatsink
 179 g, power bank/cable 164 g, standoffs). With corrected motor plugs it balanced on the earlier
@@ -259,8 +259,8 @@ Keep gains fixed during regressions; further integral increases need a new asses
 
 **Stage 10 motion link: link accepted, floor closure open.** Plan:
 `plans/2026-09-26-stage10-motion-command-link.md`, decisions accepted 2026-09-28.
-Phases 0–6 done: parser/governor/ring `a52210b` (historical host 94/94), ISR ring `72af2ab`,
-main-loop glue/telemetry `00735e0`, host tools. Bench covered every B7 row except hardware
+Phases 0–6 done: parser/governor/ring `bdefdf3` (historical host 94/94), ISR ring `37b1ea4`,
+main-loop glue/telemetry `9750828`, host tools. Bench covered every B7 row except hardware
 receive error (`devlog/artefacts/2026-10-10-stage10-phase6-bench.txt`). Arrival order means
 space then `a` in one pass arms. F1/F2 passed; F3/F4 stalls in
 `devlog/artefacts/2026-10-10-stage10-phase7-hold.txt` were addressed by Stage 11 (closed
@@ -296,7 +296,7 @@ a fallback: UART5 PC12/PD2, reference 9600 baud, `YahBoom_BL`, FFE0/FFE1 verifie
 PC MediaTek GATT discovery hangs.
 
 **C++23:** validation complete with the hardware-comparison qualification above;
-`plans/2026-09-26-cpp23-migration.md`. Migration committed as `23aeaaf`.
+`plans/2026-09-26-cpp23-migration.md`. Migration committed as `2ac728b`.
 **Queued:** simulation/self-righting/open-source rebuild
 (`plans/2026-09-28-simulation-self-righting-open-source-roadmap.md`, after Stage 10).
 
@@ -307,10 +307,10 @@ verifies a 49,280-byte binary followed by running turn telemetry. `i` reaches 10
 is consistent with ff=1. On 2026-10-26 a boot banner directly confirmed limit 1000, but not every
 gain. Current source instead sets limit 2000, as qualified above; the boot print shares that
 constant with the constructor. Current source retains the control settings introduced in
-`3aab687`: balance `(12240,94,0)`, velocity `(7000,35,2000)`, yaw `(1,30,100,1)`.
+`053de0d`: balance `(12240,94,0)`, velocity `(7000,35,2000)`, yaw `(1,30,100,1)`.
 Range telemetry (also enabled while armed in source) and the fresh-interval diagnostic are
-committed as `625a6af`; additional yaw tests as `b07fde6`. Historical Stage 11 remains closed
-at the earlier `076b4a6` configuration, not the larger current limit. Battery cutoff off;
+committed as `df5827b`; additional yaw tests as `2d5acd8`. Historical Stage 11 remains closed
+at the earlier `3a8e648` configuration, not the larger current limit. Battery cutoff off;
 `FAULT_INJECT` absent. Governor unchanged:
 ±100 mm/s, ±30 deg/s, 200 mm/s², 60 deg/s², 250 ms. Latest full Windows host build/CTest
 **148/148 passed (2026-11-07)**; latest saved Docker suite remains 96/96 (2026-10-30).
@@ -324,22 +324,22 @@ images are superseded for current diagnostic work; binary lengths are not ELF te
 
 | Milestone | Where | Evidence |
 |---|---|---|
-| Periodic health-row parser and host integration; 148/148 host tests | 2026-11-07, `d86a947`; host tests only | `plans/2026-11-07-health-row-parsing.md` and its archived host CTest log |
-| Explicit state-event parser and host integration; 141/141 host tests | 2026-11-06, `aa4c1a9`; PC tests only | `plans/2026-11-06-state-event-parsing.md` and its cited host CTest artefacts |
-| Bounded line buffer and host integration; 124/124 host tests | 2026-11-06, `aa4c1a9`; PC tests only | `plans/2026-11-06-bounded-serial-line-buffer.md` and its cited host CTest artefacts |
-| ROS-independent RANGE parser and host integration; 108/108 host tests | 2026-11-06, `e56ba10`; first core slice only | `sessions/2026-11-06.md` and its saved host CTest artefacts |
-| C++23 build/test validation and reported hardware smoke | 2026-10-30, `23aeaaf`; hardware comparison qualified by limit 2000 source | `sessions/2026-10-30.md` |
-| Fresh-packet-gated control | `fa6eb90` | |
-| 1 kHz TIM2 monotonic clock behind `IMonotonicClock`; rate measured at 1.001 | `1bd5bb4` | |
+| Periodic health-row parser and host integration; 148/148 host tests | 2026-11-07, `886c1a6`; host tests only | `plans/2026-11-07-health-row-parsing.md` and its archived host CTest log |
+| Explicit state-event parser and host integration; 141/141 host tests | 2026-11-06, `75ffffa`; PC tests only | `plans/2026-11-06-state-event-parsing.md` and its cited host CTest artefacts |
+| Bounded line buffer and host integration; 124/124 host tests | 2026-11-06, `75ffffa`; PC tests only | `plans/2026-11-06-bounded-serial-line-buffer.md` and its cited host CTest artefacts |
+| ROS-independent RANGE parser and host integration; 108/108 host tests | 2026-11-06, `5621495`; first core slice only | `sessions/2026-11-06.md` and its saved host CTest artefacts |
+| C++23 build/test validation and reported hardware smoke | 2026-10-30, `2ac728b`; hardware comparison qualified by limit 2000 source | `sessions/2026-10-30.md` |
+| Fresh-packet-gated control | `17f6a00` | |
+| 1 kHz TIM2 monotonic clock behind `IMonotonicClock`; rate measured at 1.001 | `5da4125` | |
 | Stage 2B stale-data motor shutdown — all four gates | verified on a clean image 2026-09-05 | |
-| Stage 5 encoder-sign normalisation | `42ce5c6` | |
+| Stage 5 encoder-sign normalisation | `c8cec91` | |
 | Stage 6 velocity P at `BalancePD(10200, 78, 0)` / `VelocityPI(7000, 0, 200)` | restrained, 2026-09-09 | |
-| Encoder backlog drain on fault/recovery | `6cad87d`, 2026-09-18 | `devlog/artefacts/2026-09-18-backlog-drain-verification.txt` |
-| Intentional launch gate | `09009ca` + `ab08218`, 2026-09-22 | `devlog/artefacts/2026-09-22-launch-gate-verification.txt` |
-| Stage 7 velocity integral at `VelocityPI(7000, 35, 200)` | `7aa0053`, free balance 2026-09-24 | `devlog/artefacts/2026-09-24-stage7-ki35-limit200-verification.txt` |
+| Encoder backlog drain on fault/recovery | `04eaa4b`, 2026-09-18 | `devlog/artefacts/2026-09-18-backlog-drain-verification.txt` |
+| Intentional launch gate | `83dbde9` + `963ef8a`, 2026-09-22 | `devlog/artefacts/2026-09-22-launch-gate-verification.txt` |
+| Stage 7 velocity integral at `VelocityPI(7000, 35, 200)` | `936fa90`, free balance 2026-09-24 | `devlog/artefacts/2026-09-24-stage7-ki35-limit200-verification.txt` |
 | Stage 4b `mid_angle = 0.0f` | operator reconfirmed 2026-09-24 | |
 | B7 hardware rows, 10/10 | 2026-09-24 | row 8: `devlog/artefacts/2026-09-24-b7-row8-stale-launch-gate.txt` |
-| Stage 9 yaw-rate turn control at `YawRateP(1.0f, 30.0f, 100)` | `0d867d6`, `f94d16c`, `1240e22`, `2628a4a`, 2026-09-26 | see below |
+| Stage 9 yaw-rate turn control at `YawRateP(1.0f, 30.0f, 100)` | `f70a916`, `7061dcd`, `7df5b64`, `ea01446`, 2026-09-26 | see below |
 | Stage 11 velocity integral limit 200 → 400 for commanded drive | `VelocityPI(7000, 35, 400)`, floor 2026-10-17 | see below |
 
 Original evidence for the safety pair: `devlog/artefacts/2026-09-12-stage7-integral-windup-and-fault-recovery.txt`.
