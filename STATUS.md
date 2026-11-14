@@ -3,7 +3,7 @@
 Where the project stands, with the evidence for each claim. Reconciled by the `status` skill;
 `AGENTS.md` holds the standing rules and does not repeat what is here.
 
-Last updated: 2026-11-09.
+Last updated: 2026-11-14.
 
 ## Now
 
@@ -12,7 +12,7 @@ retained for supervised development after the 2026-10-24 holds, small-push recov
 direction-reversal and turn captures. Residual creep, cycling, hesitation and weak turn-rate
 tracking remain. Stage 10 is still open. Battery cutoff remains off.
 
-**Next: a small read-only ROS 2 range bridge on the Q6A. Core parsers are complete.**
+**Read-only ROS bridge live on the Q6A (plan Step 1 accepted 2026-11-14). Next: plan Step 2, an armed RANGE capture.**
 The operator agreed on 2026-11-01 to bring ROS forward and build proximity stopping as ROS
 nodes, replacing the earlier non-ROS-demo-first order. The updated
 `plans/2026-09-09-sbc-integration-and-avoidance.md` is **in-progress**: publish existing
@@ -47,11 +47,40 @@ discovery reports `balance_car_core found`. The colcon CTest run emits a non-fat
 defines `RangeReading.msg`: receipt-time `Header`, explicit `STATUS_*` constants, uint32
 sequence/completed_ms/distance_mm/reported_age_ms in wire units, no boot epoch. Q6A colcon build
 and `ros2 interface show` passed (`sessions/artefacts/2026-11-09/q6a-interfaces-build-pasted.txt`).
-`ros2/src/balance_car_bridge/` holds only `to_msg()` (core reading to message, exhaustive
-status `switch`) and two gtests; the bridge XML reports **2 tests, 0 failures** on the Q6A
-(`sessions/artefacts/2026-11-09/q6a-bridge-mapping-test-pasted.txt`). A test-file
-explicit-constructor warning at line 47 is unfixed. Next: serial reader, then the rclcpp node.
-No serial port was opened; no ROS node exists; live publication remains pending.
+`ros2/src/balance_car_bridge/` (2026-11-14, `874a999` and `83c2dda`) holds three parts:
+- `to_msg()` and `range_message()`, which turn a line into a message;
+- `SerialLink`, which opens the port read-only and nonblocking, takes `flock` and `TIOCEXCL`, and
+  sets raw 115200 8N1 with DTR=1/RTS=0, as `drive.py` does;
+- the `range_bridge` node, which drains the port every 10 ms and publishes `/car/range` with
+  SensorDataQoS. It logs health rows at DEBUG and every other line at INFO.
+
+Q6A tests: 7 cases, 0 failures (4 mapping, 3 SerialLink on a pseudo-terminal):
+`sessions/artefacts/2026-11-14/test_{serial_link,range_mapping}-q6a.gtest.xml`.
+
+**Step 1 live check (disarmed, 2026-11-14):**
+- All 736 echoed `/car/range` messages matched their raw RANGE lines on every field. Both `timeout`
+  readings came through as status 3, and sequence numbers had no gaps over 882 lines.
+- Opening the port did not reset the MCU on two opens: no boot lines, and uptime continuous. One
+  open was with the car in FAULT, the other with it DISARMED. That the DTR/RTS handling is safe is
+  inferred from the absence of a reset; the line levels were not measured.
+- `FAULT` and `RECOVERED` appeared in the log, and recovery left the car DISARMED.
+- A bag of 214 messages was recorded.
+- Evidence: `sessions/artefacts/2026-11-14/q6a-range-bridge-2d.log`, `q6a-range-echo-2d.txt`,
+  `q6a-range-bridge-bag-run.log` and `q6a-bag-range-2d/`.
+- Observe mode makes no serial writes, by construction (`O_RDONLY`).
+- Not yet exercised: the unplug (hang-up) path.
+
+Next is plan Step 2: an armed RANGE capture during a supervised restrained hold, with `dtmax`
+read afterwards. That capture uses `drive.py`, because the bridge cannot arm the car. See
+`sessions/2026-11-14.md`.
+
+**Workstation (2026-11-14):** development now also runs on the Ubuntu 24.04 side of the dual boot
+(`plans/2026-11-13-ubuntu-workstation-switchover.md`, in-progress). `tools/switch-check.sh` runs at
+session start. On 2026-11-14 the public history was rewritten to remove personal emails, so hashes
+before `c53a6e0` changed; the old-to-new map is
+`sessions/artefacts/2026-11-14/history-rewrite-commit-map.txt`. The Isaac Sim sandbox
+(`plans/2026-11-10-isaac-sim-stock-model-sandbox.md`, ready-to-implement) is Part C of that plan.
+Its Isaac version choice awaits the operator.
 
 **First core slice complete, committed as `5621495` (2026-11-06).**
 `ros2/src/balance_car_core/` contains package metadata, a C++23 `parse_range()` implementation
@@ -86,8 +115,8 @@ final test brace at the user's request. The parser preserves wire units and dist
 armed/disarmed layouts without granting arm permission. The full Windows host build and CTest
 passed **148/148**, zero failures, in **1.93 s**; archived log:
 `sessions/artefacts/2026-11-07/host-ctest-health-telemetry-lasttest.log`.
-Serial transport, live ROS publication and proximity
-stopping are not implemented. The ROS packages are MIT-licensed (2026-11-14); core install/export rules
+Proximity
+stopping and any ROS command path are not implemented. The ROS packages are MIT-licensed (2026-11-14); core install/export rules
 are verified on the Q6A. No firmware build, flash or hardware run occurred today.
 
 **Forward roadmap:** `plans/2026-11-01-feature-roadmap.md` (in-progress) sequences what follows:
@@ -147,7 +176,8 @@ capture_error), boot/config limit 2000 and RANGE resuming after disarm, consiste
 acquisition. `sessions/artefacts/2026-10-31/range-500mm-moved-pasted.txt` has 264 valid results;
 the operator moved the target. Selected seq 1539-1559 spans 489-507 mm, mean 500.14 mm.
 `sessions/artefacts/2026-10-31/range-1000mm-pasted.txt` has 330 valid/four timeouts with later
-valid returns; selected seq 2827-2952 median 1019 mm, mean 1024.78 mm. Operator judged accuracy
+valid returns; selected seq 2827-2952 median 1019 mm, mean 1024.78 mm. (That file is absent on
+Ubuntu as of 2026-11-14, probably a MEGA gap; check the Windows copy before relying on it.) Operator judged accuracy
 sufficient; no calibration change planned. Operator-confirmed target removal/return around 500 mm
 in `sessions/artefacts/2026-10-31/range-target-loss-500mm-pasted.txt` has 351 valid/two early
 timeouts, with repeated near 500 mm sections and other valid background returns. Removal does
