@@ -43,3 +43,10 @@ Update `Last updated:` in `STATUS.md`. Report what you changed and what you veri
 leaving the line to stand by default.
 
 Do not pad either file. Prefer correcting a line to adding one, and delete what stopped being true.
+
+**Obsidian mirror, last.** If `tools/sync-vault.sh` exists, run `sh tools/sync-vault.sh` after
+`STATUS.md` is final, and pass its `SKIP` and `NOTE` lines on in your report. It copies
+`sessions/`, `learning/`, `issues/`, `plans/` and `STATUS.md` one way into the vault, never deletes,
+and skips a vault copy that is newer than the repo's. Do not edit vault-only notes or
+`Project Breakdown/` to clear a `NOTE`; report it. Skip silently when the script is missing:
+`tools/` is local-only.
