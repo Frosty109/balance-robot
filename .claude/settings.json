@@ -33,5 +33,20 @@
       "Bash(git push*)",
       "PowerShell(git push*)"
     ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && if [ -f tools/switch-check.sh ]; then sh tools/switch-check.sh --hook; else echo '{\"systemMessage\":\"switch-check: tools/switch-check.sh is missing; MEGA may not have delivered tools/ yet\"}'; fi",
+            "timeout": 30,
+            "statusMessage": "Checking MEGA and git after an OS switch"
+          }
+        ]
+      }
+    ]
   }
 }

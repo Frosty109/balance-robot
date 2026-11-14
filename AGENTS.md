@@ -39,6 +39,10 @@ The battery cutoff is off. Supervised runs only.
   already say. This overrides any longer default.
 - Preserve unrelated working-tree changes. The tree is often intentionally dirty during hardware
   sessions.
+- At session start, run `sh tools/switch-check.sh` unless its result is already in context (a
+  Claude Code `SessionStart` hook runs it). Report any `TODO` or `STOP` line to the user before
+  other work. It checks that MEGA is idle and the repo matches `origin` after an OS switch, and it
+  changes nothing.
 - For physical-control changes, distinguish measurements from inference, change one control
   category at a time, and specify a safe restrained test.
 - A successful build does not verify hardware behaviour. Hardware claims need controlled physical
@@ -117,7 +121,7 @@ Either way, only flash with the car disarmed or off.
 | `devlog/` | public-facing notes and drafts; read `devlog/README.md` first | no |
 | `reviews/` | review findings and adjudications | yes |
 | `radxa/` | Q6A setup notes and the drive/flash workflow for the car | no |
-| `tools/` | host tools: `drive.ps1`, `drive.py`, `flash.sh` | no |
+| `tools/` | host tools: `drive.ps1`, `drive.py`, `flash.sh`, `switch-check.sh`, `sync-vault.sh` | no |
 | `Yahboom-Self-Balancing-Car/` | reference source; verify values here, not from memory | no |
 
 The local-only records are synced by MEGA and backed up with FreeFileSync to a second drive and to
