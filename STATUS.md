@@ -12,7 +12,7 @@ retained for supervised development after the 2026-10-24 holds, small-push recov
 direction-reversal and turn captures. Residual creep, cycling, hesitation and weak turn-rate
 tracking remain. Stage 10 is still open. Battery cutoff remains off.
 
-**Read-only ROS bridge live on the Q6A (plan Step 1 accepted 2026-11-14). Next: plan Step 2, an armed RANGE capture.**
+**Read-only ROS bridge live on the Q6A (plan Step 1 accepted 2026-11-14). Plan Step 2 in progress: the flashed image prints no RANGE while armed; HEAD rebuilt, flash pending.**
 The operator agreed on 2026-11-01 to bring ROS forward and build proximity stopping as ROS
 nodes, replacing the earlier non-ROS-demo-first order. The updated
 `plans/2026-09-09-sbc-integration-and-avoidance.md` is **in-progress**: publish existing
@@ -22,7 +22,7 @@ holds the serial line grammar the bridge parses (§4.1), a replay adapter for dr
 no-reset-on-open check, a predicted armed dtmax of about 17-19 ms from blocking prints (inference,
 not measured), and a hold-to-run lease renewed by operator keystrokes so a Wi-Fi stall cannot keep
 a run alive. ROS Jazzy is installed on the Q6A (SSH-verified 2026-11-07). The `ros2/` workspace holds the
-plain-CMake core plus the new interface and bridge packages below; no ROS nodes exist yet. Jazzy targets the Q6A's
+plain-CMake core plus the interface and bridge packages below, including the `range_bridge` node. Jazzy targets the Q6A's
 Ubuntu 24.04 ARM64 platform. Language decided 2026-11-04: C++ (`rclcpp`) for the bridge,
 operator lease and proximity policy, over a ROS-independent core testable on the PC; Python for
 tooling only. The operator guides-and-types the code; Q6A was unreachable over SSH on 2026-11-04.
@@ -52,7 +52,8 @@ and `ros2 interface show` passed (`sessions/artefacts/2026-11-09/q6a-interfaces-
 - `SerialLink`, which opens the port read-only and nonblocking, takes `flock` and `TIOCEXCL`, and
   sets raw 115200 8N1 with DTR=1/RTS=0, as `drive.py` does;
 - the `range_bridge` node, which drains the port every 10 ms and publishes `/car/range` with
-  SensorDataQoS. It logs health rows at DEBUG and every other line at INFO.
+  SensorDataQoS. It logs parsed RANGE lines and health rows at DEBUG, malformed RANGE or over-long
+  lines at WARN, and everything else at INFO.
 
 Q6A tests: 7 cases, 0 failures (4 mapping, 3 SerialLink on a pseudo-terminal):
 `sessions/artefacts/2026-11-14/test_{serial_link,range_mapping}-q6a.gtest.xml`.
@@ -67,12 +68,22 @@ Q6A tests: 7 cases, 0 failures (4 mapping, 3 SerialLink on a pseudo-terminal):
 - A bag of 214 messages was recorded.
 - Evidence: `sessions/artefacts/2026-11-14/q6a-range-bridge-2d.log`, `q6a-range-echo-2d.txt`,
   `q6a-range-bridge-bag-run.log` and `q6a-bag-range-2d/`.
-- Observe mode makes no serial writes, by construction (`O_RDONLY`).
+- Observe mode makes no serial writes, by construction (`O_RDONLY`). Qualification (inference,
+  untested): if the port opens with `ECHO` set, the kernel echoes bytes received before
+  `tcsetattr()`; `SerialLink` also leaves `VMIN`/`VTIME` as inherited. See `issues/2026-11-14.md`.
 - Not yet exercised: the unplug (hang-up) path.
 
-Next is plan Step 2: an armed RANGE capture during a supervised restrained hold, with `dtmax`
-read afterwards. That capture uses `drive.py`, because the bridge cannot arm the car. See
-`sessions/2026-11-14.md`.
+**Step 2, first armed capture (2026-11-14, `drive.py`):** a clean 49 s restrained hold (489 armed
+rows 99-101 ms apart, `poll=4`, no STALE/FAULT/BOOT) printed **zero RANGE lines while armed**; seq
+jumped 943 -> 1434, so 490 results were acquired and not printed. The running 2026-11-01 image
+therefore still has the disarmed-only print guard and predates `df5827b`. `dtmax` rose 9 -> 12 ms
+with the armed row alone. Evidence: `sessions/artefacts/2026-11-14/2026-11-14-step2-armed-range.txt`.
+HEAD `99f0050` is built on Ubuntu with Arm GNU Toolchain 15.2.Rel1 (GCC 15.2.1, -O0, as every earlier
+image) in `build-fw-linux/`: ELF text/data/bss 52476/140/2548, `firmware.bin` 52,616 bytes, SHA-256
+`16747de9dfe59a0e3cb29d2d1977940de3fc78ea4fab9c79086ce04de9ef9608`; old ELF has five `armed()`
+calls in `main`, new four, matching source. Not yet copied to the Q6A or flashed. Next: flash on a
+secured car, then repeat the capture; accept on RANGE while armed and `dtmax` < 25 ms (17-19 ms
+predicted, inference, possibly high). See `sessions/2026-11-14.md`.
 
 **Workstation (2026-11-14):** development now also runs on the Ubuntu 24.04 side of the dual boot
 (`plans/2026-11-13-ubuntu-workstation-switchover.md`, in-progress). `tools/switch-check.sh` runs at
@@ -117,7 +128,7 @@ passed **148/148**, zero failures, in **1.93 s**; archived log:
 `sessions/artefacts/2026-11-07/host-ctest-health-telemetry-lasttest.log`.
 Proximity
 stopping and any ROS command path are not implemented. The ROS packages are MIT-licensed (2026-11-14); core install/export rules
-are verified on the Q6A. No firmware build, flash or hardware run occurred today.
+are verified on the Q6A.
 
 **Forward roadmap:** `plans/2026-11-01-feature-roadmap.md` (in-progress) sequences what follows:
 camera, expression display, odometry and bounded moves, a read-only LLM, a model router across
@@ -140,9 +151,9 @@ echo, internal TIM5_CH3 provides a 30 ms deadline, with attempts at least 100 ms
 TIM3/4 encoders and TIM8 PWM are unchanged. Main services range after `app.update()`; sensing
 does not command motion. The saved 2026-11-01 diagnostic captures cover disarmed RANGE printing;
 acquisition continues while armed. Source committed as `df5827b` uses
-`if (range_sensor.poll())`, enabling printing in both states. On 2026-11-04 the operator reported
-armed RANGE printing as fine; no capture or armed dtmax was saved, so the predicted armed load
-remains unmeasured. Completion timestamps
+`if (range_sensor.poll())`, enabling printing in both states. That source is **not** what the car
+runs: the 2026-11-14 armed capture printed no RANGE while armed (the 2026-11-04 report that armed
+printing was fine was wrong). The armed RANGE print load remains unmeasured. Completion timestamps
 retain conservative acquisition timing; capture errors use attempt start. The `dtmax` diagnostic,
 also committed in `df5827b`, tracks maximum successive fresh IMU
 poll-completion intervals, skips the first sample, persists across faults/arm/disarm and prints
@@ -344,7 +355,8 @@ at the earlier `3a8e648` configuration, not the larger current limit. Battery cu
 `FAULT_INJECT` absent. Governor unchanged:
 ±100 mm/s, ±30 deg/s, 200 mm/s², 60 deg/s², 250 ms. Latest full Windows host build/CTest
 **148/148 passed (2026-11-07)**; latest saved Docker suite remains 96/96 (2026-10-30).
-Latest documented firmware build passed on 2026-11-01, ELF text/data/bss
+Latest firmware build: HEAD `99f0050` on 2026-11-14 (Ubuntu, `build-fw-linux/`, 52,616-byte
+binary), not yet flashed. The running image is the 2026-11-01 build, ELF text/data/bss
 52516/140/2548 bytes. Operator Q6A output verifies a 52656-byte write and reset; the subsequent
 BOOT/config/dtmax capture confirms the diagnostic runs with limit 2000. No readback hash or
 full runtime gain banner was supplied. The historical 49280-byte and 52584-byte programming
@@ -429,7 +441,7 @@ These were once listed as gates to free balancing and demonstrably were not. The
 
 | Item | State | Reopen when |
 |---|---|---|
-| Stage 3 FIFO/backlog acquisition | FIFO depth and worst-case sample age unmeasured; `Imu::read()` discards the DMP `more` count. Earlier balancing at 199.6 Hz with 3–4 ms worst-case polls. Disarmed range/serial-load diagnostic observed max fresh-service interval 11 ms on 2026-11-01; armed printing and timeout-path load remain unmeasured. FIFO sample age is still unknown. | balance/timing trouble, added runtime load, or FIFO overflow — expose the `more` high-water mark before redesigning acquisition |
+| Stage 3 FIFO/backlog acquisition | FIFO depth and worst-case sample age unmeasured; `Imu::read()` discards the DMP `more` count. Earlier balancing at 199.6 Hz with 3–4 ms worst-case polls. Disarmed range/serial-load diagnostic observed max fresh-service interval 11 ms on 2026-11-01; armed row alone (no RANGE) 12 ms on 2026-11-14; armed RANGE printing and timeout-path load remain unmeasured. FIFO sample age is still unknown. | balance/timing trouble, added runtime load, or FIFO overflow — expose the `more` high-water mark before redesigning acquisition |
 | Battery measurement and cutoff (D4) | Cutoff off. Same ADC scale and 4.03 divider as Yahboom, but Yahboom averages 50 readings over ~1 s where ours averages four immediate conversions; a filtering problem is plausible but unproven. 2026-10-10: ~7.5 V at run start but ~5.6 V straight after every disarm in later runs (2S pack, ~8.4 V full); one run with zero wheel motion at ±4800 commanded. 2026-10-17: `battery=` jumps between ~5.6 V and ~7.6 V within one 100 ms row, with the motors off, during disarmed tipping and after boot. Still not measured at the pack; Stage 11 Phase 0 was waived by the operator. **Supervised runs only.** | before any unattended use, or any independent sign of battery trouble |
 | Reboot while armed | Two reboots while armed/driving: 2026-10-10 and 2026-10-17 at 30.55 s of the first limit 400 run (USB dropped, BOOT 1.2 s later, disarmed, then fell). Power loss was inferred, not electrically measured. On 2026-10-24 CH340 remained present with the switch off, so adapter presence cannot establish MCU power. No third armed reboot shown today; cause still unknown. | before a run where a fall would cause damage, or a third occurrence |
 | Commanded-turn tracking | ff=1/cap 100 now demonstrated both directions and short combined left motion. At zero forward target, ±30°/s requests averaged +8.0/−12.4°/s across mixed windows; max absolute tr 60. Direction works, precise tracking remains weak. Keep gains/cap unchanged through remaining regressions. Earlier ff 16/cap 500 proposal is not the next accepted change. | after link-loss/combined-motion regression, if stronger or more accurate turning is required |

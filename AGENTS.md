@@ -71,7 +71,10 @@ stm32/FWLib + CMSIS      retained C vendor libraries
 ## Build, test and flash
 
 Two build directories are in use: `build/` for the host tests and simulator, and
-`build-fw-stage1-clean/` for the firmware.
+`build-fw-stage1-clean/` for the firmware. Those are Windows CMake caches. On Ubuntu the firmware
+builds in `build-fw-linux/` with Arm GNU Toolchain 15.2.Rel1 first on `PATH`
+(`~/opt/arm-gnu-toolchain-15.2.rel1-x86_64-arm-none-eabi/bin`), the same GCC 15.2.1 that built
+every earlier image; keep that compiler when comparing timing.
 
 ```bash
 cmake -B build
