@@ -12,7 +12,7 @@ retained for supervised development after the 2026-10-24 holds, small-push recov
 direction-reversal and turn captures. Residual creep, cycling, hesitation and weak turn-rate
 tracking remain. Stage 10 is still open. Battery cutoff remains off.
 
-**Read-only ROS bridge live on the Q6A (plan Step 1 accepted 2026-11-14). Plan Step 2 done 2026-11-19: HEAD `99f0050` flashed, RANGE prints while armed, dtmax 17 ms. Next is an operator decision: a `tools/drive.py` sonar auto-stop first (agent proposal, reverses the 2026-11-01 ROS-first order) or plan Step 3.**
+**Read-only ROS bridge live on the Q6A (plan Step 1 accepted 2026-11-14). Plan Step 2 done 2026-11-19: HEAD `99f0050` flashed, RANGE prints while armed, dtmax 17 ms. Operator decision 2026-11-19: a `tools/drive.py` sonar auto-stop first, then plan Step 3 (reverses the 2026-11-01 ROS-first order). Auto mode written and offline-tested, awaiting operator review; not yet copied to the Q6A or run on the car.**
 The operator agreed on 2026-11-01 to bring ROS forward and build proximity stopping as ROS
 nodes, replacing the earlier non-ROS-demo-first order. The updated
 `plans/2026-09-09-sbc-integration-and-avoidance.md` is **in-progress**: publish existing
