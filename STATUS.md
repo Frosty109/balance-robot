@@ -3,7 +3,7 @@
 Where the project stands, with the evidence for each claim. Reconciled by the `status` skill;
 `AGENTS.md` holds the standing rules and does not repeat what is here.
 
-Last updated: 2026-11-14.
+Last updated: 2026-11-19.
 
 ## Now
 
@@ -12,7 +12,7 @@ retained for supervised development after the 2026-10-24 holds, small-push recov
 direction-reversal and turn captures. Residual creep, cycling, hesitation and weak turn-rate
 tracking remain. Stage 10 is still open. Battery cutoff remains off.
 
-**Read-only ROS bridge live on the Q6A (plan Step 1 accepted 2026-11-14). Plan Step 2 in progress: the flashed image prints no RANGE while armed; HEAD rebuilt, flash pending.**
+**Read-only ROS bridge live on the Q6A (plan Step 1 accepted 2026-11-14). Plan Step 2 done 2026-11-19: HEAD `99f0050` flashed, RANGE prints while armed, dtmax 17 ms. Next is an operator decision: a `tools/drive.py` sonar auto-stop first (agent proposal, reverses the 2026-11-01 ROS-first order) or plan Step 3.**
 The operator agreed on 2026-11-01 to bring ROS forward and build proximity stopping as ROS
 nodes, replacing the earlier non-ROS-demo-first order. The updated
 `plans/2026-09-09-sbc-integration-and-avoidance.md` is **in-progress**: publish existing
@@ -73,7 +73,7 @@ Q6A tests: 7 cases, 0 failures (4 mapping, 3 SerialLink on a pseudo-terminal):
   `tcsetattr()`; `SerialLink` also leaves `VMIN`/`VTIME` as inherited. See `issues/2026-11-14.md`.
 - Not yet exercised: the unplug (hang-up) path.
 
-**Step 2, first armed capture (2026-11-14, `drive.py`):** a clean 49 s restrained hold (489 armed
+**Step 2, first armed capture (2026-11-14, `drive.py`):** a clean 49 s free-balance hold (489 armed
 rows 99-101 ms apart, `poll=4`, no STALE/FAULT/BOOT) printed **zero RANGE lines while armed**; seq
 jumped 943 -> 1434, so 490 results were acquired and not printed. The running 2026-11-01 image
 therefore still has the disarmed-only print guard and predates `df5827b`. `dtmax` rose 9 -> 12 ms
@@ -81,9 +81,34 @@ with the armed row alone. Evidence: `sessions/artefacts/2026-11-14/2026-11-14-st
 HEAD `99f0050` is built on Ubuntu with Arm GNU Toolchain 15.2.Rel1 (GCC 15.2.1, -O0, as every earlier
 image) in `build-fw-linux/`: ELF text/data/bss 52476/140/2548, `firmware.bin` 52,616 bytes, SHA-256
 `16747de9dfe59a0e3cb29d2d1977940de3fc78ea4fab9c79086ce04de9ef9608`; old ELF has five `armed()`
-calls in `main`, new four, matching source. Not yet copied to the Q6A or flashed. Next: flash on a
-secured car, then repeat the capture; accept on RANGE while armed and `dtmax` < 25 ms (17-19 ms
-predicted, inference, possibly high). See `sessions/2026-11-14.md`.
+calls in `main`, new four, matching source.
+
+**Step 2 done (2026-11-19).** That image was flashed through the Q6A after its SHA-256 was matched
+there. The old image is kept as `~/balance-car/firmware-2026-11-01.bin` on the Q6A. The post-flash
+check booted cleanly (`CONFIG velocity_integral_limit=2000`). A 26 s free-balance hold printed 265
+RANGE lines while armed (262 valid, 3 timeout, seq 1415-1680 with no gaps). dtmax read 17 ms after
+disarm, against 9 before arming: the bottom of the 17-19 ms prediction, under 25. dtmax is a max
+since boot, never reset. Pitch sd 1.46°, no STALE/BOOT. Armed RANGE `age` is 9-11 ms against 2-4
+disarmed. Encoder-integrated drift against range gives slope -1.01. 16/262 readings were 40-155 mm
+long, including a 0.7 s run, so a stop rule must use the minimum over a ≥1 s window. Evidence:
+`sessions/artefacts/2026-11-19/2026-11-19-{post-flash-check,step2-armed-range}.txt`,
+`sessions/2026-11-19.md`.
+- Correction: the 11-14 and 11-19 holds were free balance, not restrained.
+- Unexplained: 3.4 s of post-flash silence before BOOT (issues/2026-11-19.md).
+
+**Stereo camera fitted (2026-11-19).** ELP 3DGS1200P01-H110, owned since April:
+- one-board synchronised stereo, side-by-side MJPEG, up to 3200×1200 at 60 fps or 1280×480 at
+  120 fps; USB 2.0;
+- seen by the Q6A as `uvcvideo`. ffmpeg, v4l-utils, `v4l2_camera`, `camera_calibration` and
+  `stereo_image_proc` are installed: 17 new packages, 0 upgraded, 609 upgrades deliberately pending;
+- taped on **upside down** for now (printed case planned next year): rotate the whole frame 180°
+  before splitting into left and right;
+- use by-id device paths; numbering changes between boots.
+
+With it fitted, free-balance pitch mean moved -1.16° -> +2.36°, mean |PWM| 271 -> 381, and the
+velocity integral's mean -226 -> +728, peaking at 1905/2000 while driving. It still balances.
+Evidence: `sessions/artefacts/2026-11-19/2026-11-19-camera-mass-hold.txt`. Not yet done: baseline
+measurement, splitter node, calibration.
 
 **Workstation (2026-11-14):** development now also runs on the Ubuntu 24.04 side of the dual boot
 (`plans/2026-11-13-ubuntu-workstation-switchover.md`, in-progress). `tools/switch-check.sh` runs at
@@ -133,8 +158,10 @@ are verified on the Q6A.
 **Forward roadmap:** `plans/2026-11-01-feature-roadmap.md` (in-progress) sequences what follows:
 camera, expression display, odometry and bounded moves, a read-only LLM, a model router across
 Q6A/LAN/cloud models, voice, LiDAR, LLM-proposed actions, and a TypeScript web app starting as a
-reporting dashboard. No display or LiDAR is owned yet. Stage 10 and historical motion follow-ups
-remain open.
+reporting dashboard. The stereo camera is fitted (above); a LiDAR is on order (operator,
+2026-11-19); no display is owned. Agent recommendation, not decided: sonar stays the stop layer and
+is not used for mapping; odometry v1 next; a sonar/LiDAR/stereo/fused comparison once the LiDAR
+arrives. Stage 10 and historical motion follow-ups remain open.
 
 **Project review 2026-11-01:** `reviews/2026-11-01-project-review-findings.md`. Findings bearing on
 status: source checkpointing has since been completed (`df5827b`, `2d5acd8`, `5621495`, `75ffffa`),
@@ -441,11 +468,13 @@ These were once listed as gates to free balancing and demonstrably were not. The
 
 | Item | State | Reopen when |
 |---|---|---|
-| Stage 3 FIFO/backlog acquisition | FIFO depth and worst-case sample age unmeasured; `Imu::read()` discards the DMP `more` count. Earlier balancing at 199.6 Hz with 3–4 ms worst-case polls. Disarmed range/serial-load diagnostic observed max fresh-service interval 11 ms on 2026-11-01; armed row alone (no RANGE) 12 ms on 2026-11-14; armed RANGE printing and timeout-path load remain unmeasured. FIFO sample age is still unknown. | balance/timing trouble, added runtime load, or FIFO overflow — expose the `more` high-water mark before redesigning acquisition |
+| Stage 3 FIFO/backlog acquisition | FIFO depth and worst-case sample age unmeasured; `Imu::read()` discards the DMP `more` count. Earlier balancing at 199.6 Hz with 3–4 ms worst-case polls. Disarmed range/serial-load diagnostic observed max fresh-service interval 11 ms on 2026-11-01; armed row alone (no RANGE) 12 ms on 2026-11-14; armed row plus RANGE 17 ms on 2026-11-19; timeout-path load remains unmeasured. FIFO sample age is still unknown. | balance/timing trouble, added runtime load, or FIFO overflow — expose the `more` high-water mark before redesigning acquisition |
 | Battery measurement and cutoff (D4) | Cutoff off. Same ADC scale and 4.03 divider as Yahboom, but Yahboom averages 50 readings over ~1 s where ours averages four immediate conversions; a filtering problem is plausible but unproven. 2026-10-10: ~7.5 V at run start but ~5.6 V straight after every disarm in later runs (2S pack, ~8.4 V full); one run with zero wheel motion at ±4800 commanded. 2026-10-17: `battery=` jumps between ~5.6 V and ~7.6 V within one 100 ms row, with the motors off, during disarmed tipping and after boot. Still not measured at the pack; Stage 11 Phase 0 was waived by the operator. **Supervised runs only.** | before any unattended use, or any independent sign of battery trouble |
 | Reboot while armed | Two reboots while armed/driving: 2026-10-10 and 2026-10-17 at 30.55 s of the first limit 400 run (USB dropped, BOOT 1.2 s later, disarmed, then fell). Power loss was inferred, not electrically measured. On 2026-10-24 CH340 remained present with the switch off, so adapter presence cannot establish MCU power. No third armed reboot shown today; cause still unknown. | before a run where a fall would cause damage, or a third occurrence |
 | Commanded-turn tracking | ff=1/cap 100 now demonstrated both directions and short combined left motion. At zero forward target, ±30°/s requests averaged +8.0/−12.4°/s across mixed windows; max absolute tr 60. Direction works, precise tracking remains weak. Keep gains/cap unchanged through remaining regressions. Earlier ff 16/cap 500 proposal is not the next accepted change. | after link-loss/combined-motion regression, if stronger or more accurate turning is required |
 | Intermittent serial startup | 2026-10-26 receiver-open physical reset captured genuine BOOT/config. Explicit drive-tool DTR/RTS settings restored output and reopening received telemetry. Automatic startup reliability and electrical cause remain unresolved; no pin measurements. See Now. | any recurrence; establish supported upright RX before arming, power off before handling when disarm is unacknowledged |
+| Camera mass offset | Temporary taped camera shifted the balance point ~3.5° and left a standing velocity integral (+728 mean, 1905/2000 peak while driving); inference: less headroom one way, possible creep or asymmetric stopping. | before relying on stop distance or push recovery; when the mount moves or the printed case arrives |
+| Car link re-enumeration with the camera | `/dev/ttyUSB0` was recreated the minute the camera was first plugged into the Q6A; unknown whether the car cable was moved. Streaming did not recreate it. | before driving with both attached: hot-plug the camera with drive.py watching, disarmed |
 | Wheels stalled between the dead-zone offset and breakaway | Inference from 2026-10-17 telemetry, not a direct measurement: wheels stay at rest with commands of ≈1450–1600 PWM after the 1300 offset, so the integral cannot unwind and the car can stand on powered, stalled motors (9 s at ≈1450 in F5). **Raising `DEADZONE` to 1500 made balance oscillate within 0.5 s** (`bal` ±1800–2000 at ~3–5 Hz, `devlog/artefacts/2026-10-17-deadzone-1500.txt`); reverted. | stalls return on the wireless image, or a breakaway measurement is wanted |
 
 **Lean versus creep.** On the earlier chassis, `Ki=4` crept backwards with the velocity integral
