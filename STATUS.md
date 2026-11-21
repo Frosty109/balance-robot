@@ -3,7 +3,7 @@
 Where the project stands, with the evidence for each claim. Reconciled by the `status` skill;
 `AGENTS.md` holds the standing rules and does not repeat what is here.
 
-Last updated: 2026-11-19.
+Last updated: 2026-11-21.
 
 ## Now
 
@@ -13,6 +13,13 @@ direction-reversal and turn captures. Residual creep, cycling, hesitation and we
 tracking remain. Stage 10 is still open. Battery cutoff remains off.
 
 **Read-only ROS bridge live on the Q6A (plan Step 1 accepted 2026-11-14). Plan Step 2 done 2026-11-19: HEAD `99f0050` flashed, RANGE prints while armed, dtmax 17 ms. Operator decision 2026-11-19: a `tools/drive.py` sonar auto-stop first, then plan Step 3 (reverses the 2026-11-01 ROS-first order). Auto mode written and offline-tested, awaiting operator review; not yet copied to the Q6A or run on the car.**
+**2026-11-21: readability refactor `3ec0d3b` flashed and accepted for development.** No intended
+behaviour change; image `b5acd827…` (the -O0 bytes differ, so -O2 object comparison plus host tests
+stood in for byte identity). Car run against Step 2: two free-balance holds, drive ±50 mm/s with the
+200 mm/s² slew, 7 fault/recover cycles at 40°/10°, dtmax 12 ms, poll 4 ms, 101 ms telemetry
+(`sessions/artefacts/2026-11-21/2026-11-21-refactor-01.txt`). Not re-run on the car: turning, bad-CRC,
+frame pause, angle arm-rejection, STALE. Accepted image kept on the Q6A as `firmware-16747de9.bin`.
+The refactored `ros2/` bridge files that need rclcpp have not been colcon-built on the Q6A yet.
 The operator agreed on 2026-11-01 to bring ROS forward and build proximity stopping as ROS
 nodes, replacing the earlier non-ROS-demo-first order. The updated
 `plans/2026-09-09-sbc-integration-and-avoidance.md` is **in-progress**: publish existing
@@ -382,12 +389,11 @@ at the earlier `3a8e648` configuration, not the larger current limit. Battery cu
 `FAULT_INJECT` absent. Governor unchanged:
 ±100 mm/s, ±30 deg/s, 200 mm/s², 60 deg/s², 250 ms. Latest full Windows host build/CTest
 **148/148 passed (2026-11-07)**; latest saved Docker suite remains 96/96 (2026-10-30).
-Latest firmware build: HEAD `99f0050` on 2026-11-14 (Ubuntu, `build-fw-linux/`, 52,616-byte
-binary), not yet flashed. The running image is the 2026-11-01 build, ELF text/data/bss
-52516/140/2548 bytes. Operator Q6A output verifies a 52656-byte write and reset; the subsequent
-BOOT/config/dtmax capture confirms the diagnostic runs with limit 2000. No readback hash or
-full runtime gain banner was supplied. The historical 49280-byte and 52584-byte programming
-images are superseded for current diagnostic work; binary lengths are not ELF text sizes.
+Ubuntu host build/CTest **148/148** before and after the 2026-11-21 refactor.
+Running image: `3ec0d3b`, built on Ubuntu in `build-fw-linux/` (GCC 15.2.1, -O0), ELF text/data/bss
+52540/140/2548, `firmware.bin` 52,680 bytes, SHA-256 `b5acd82764d6062791f1b87b6c73daaa…`, flashed
+2026-11-21 through the Q6A. It replaced `99f0050` (`16747de9…`, flashed 2026-11-19), which is kept on
+the Q6A. Gains and governor as above; `stm32/USER/main.cpp` was not changed by the refactor.
 
 ## Closed milestones
 
