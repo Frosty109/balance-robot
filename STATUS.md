@@ -12,14 +12,17 @@ retained for supervised development after the 2026-10-24 holds, small-push recov
 direction-reversal and turn captures. Residual creep, cycling, hesitation and weak turn-rate
 tracking remain. Stage 10 is still open. Battery cutoff remains off.
 
-**Read-only ROS bridge live on the Q6A (plan Step 1 accepted 2026-11-14). Plan Step 2 done 2026-11-19: HEAD `99f0050` flashed, RANGE prints while armed, dtmax 17 ms. Operator decision 2026-11-19: a `tools/drive.py` sonar auto-stop first, then plan Step 3 (reverses the 2026-11-01 ROS-first order). Auto mode written and offline-tested, awaiting operator review; not yet copied to the Q6A or run on the car.**
+**Read-only ROS bridge live on the Q6A (plan Step 1 accepted 2026-11-14). Plan Step 2 done 2026-11-19: HEAD `99f0050` flashed, RANGE prints while armed, dtmax 17 ms. Operator decision 2026-11-19: a `tools/drive.py` sonar auto-stop first, then plan Step 3 (reverses the 2026-11-01 ROS-first order). Auto mode reviewed by the operator 2026-11-21 (one fix: the key that ends a run no longer acts) and installed on the Q6A; not yet run on the car.**
 **2026-11-21: readability refactor `3ec0d3b` flashed and accepted for development.** No intended
 behaviour change; image `b5acd827…` (the -O0 bytes differ, so -O2 object comparison plus host tests
 stood in for byte identity). Car run against Step 2: two free-balance holds, drive ±50 mm/s with the
 200 mm/s² slew, 7 fault/recover cycles at 40°/10°, dtmax 12 ms, poll 4 ms, 101 ms telemetry
 (`sessions/artefacts/2026-11-21/2026-11-21-refactor-01.txt`). Not re-run on the car: turning, bad-CRC,
 frame pause, angle arm-rejection, STALE. Accepted image kept on the Q6A as `firmware-16747de9.bin`.
-The refactored `ros2/` bridge files that need rclcpp have not been colcon-built on the Q6A yet.
+The refactored `ros2/src` (`cc8b439`) is on the Q6A: colcon build of all three packages clean,
+`colcon test` 61 tests, 0 failures (2026-11-21). Pre-refactor sources kept as
+`~/balance-car/ros2-src-6e896a6.tgz`. The new `drive.py` with the auto-stop (`8c461191…`) is on the
+Q6A, self-test PASS there; old copy `drive-2026-11-19.py`. Auto-stop not yet run on the car.
 The operator agreed on 2026-11-01 to bring ROS forward and build proximity stopping as ROS
 nodes, replacing the earlier non-ROS-demo-first order. The updated
 `plans/2026-09-09-sbc-integration-and-avoidance.md` is **in-progress**: publish existing
