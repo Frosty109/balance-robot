@@ -12,7 +12,15 @@ retained for supervised development after the 2026-10-24 holds, small-push recov
 direction-reversal and turn captures. Residual creep, cycling, hesitation and weak turn-rate
 tracking remain. Stage 10 is still open. Battery cutoff remains off.
 
-**Read-only ROS bridge live on the Q6A (plan Step 1 accepted 2026-11-14). Plan Step 2 done 2026-11-19: HEAD `99f0050` flashed, RANGE prints while armed, dtmax 17 ms. Operator decision 2026-11-19: a `tools/drive.py` sonar auto-stop first, then plan Step 3 (reverses the 2026-11-01 ROS-first order). Auto mode reviewed by the operator 2026-11-21 (one fix: the key that ends a run no longer acts) and installed on the Q6A; not yet run on the car.**
+**Read-only ROS bridge live on the Q6A (plan Step 1 accepted 2026-11-14). Plan Step 2 done 2026-11-19: HEAD `99f0050` flashed, RANGE prints while armed, dtmax 17 ms. Operator decision 2026-11-19: a `tools/drive.py` sonar auto-stop first, then plan Step 3 (reverses the 2026-11-01 ROS-first order). Auto mode reviewed by the operator 2026-11-21 (one fix: the key that ends a run no longer acts), installed on the Q6A, and run on the car: 2/2 supervised runs stopped on the obstacle.**
+**First auto-stop runs (2026-11-21), `--stop-mm 400`, 50 mm/s:** `AUTO STOP reason=obstacle` at
+393 and 395 mm, within 1 ms of the reading; coast ~32 mm by sonar, wheels at rest by ~0.9 s; no
+non-valid readings during either run. Then, unexpectedly, the car rolled back ~80–90 mm (by encoder)
+starting 1–2 s after the stop, away from the obstacle here. Cause inferred, not proven: velocity
+integral unwinding plus the camera's standing integral. Unmeasured for a stop while reversing.
+Evidence: `sessions/artefacts/2026-11-21/2026-11-21-auto-01.txt` (third session in the file).
+A camera unplug/replug left `/dev/ttyUSB0` and the link untouched (one trial;
+`2026-11-21-camera-replug.txt`), so the camera is not blocking driving.
 **2026-11-21: readability refactor `3ec0d3b` flashed and accepted for development.** No intended
 behaviour change; image `b5acd827…` (the -O0 bytes differ, so -O2 object comparison plus host tests
 stood in for byte identity). Car run against Step 2: two free-balance holds, drive ±50 mm/s with the
@@ -22,7 +30,7 @@ frame pause, angle arm-rejection, STALE. Accepted image kept on the Q6A as `firm
 The refactored `ros2/src` (`cc8b439`) is on the Q6A: colcon build of all three packages clean,
 `colcon test` 61 tests, 0 failures (2026-11-21). Pre-refactor sources kept as
 `~/balance-car/ros2-src-6e896a6.tgz`. The new `drive.py` with the auto-stop (`8c461191…`) is on the
-Q6A, self-test PASS there; old copy `drive-2026-11-19.py`. Auto-stop not yet run on the car.
+Q6A, self-test PASS there; old copy `drive-2026-11-19.py`.
 The operator agreed on 2026-11-01 to bring ROS forward and build proximity stopping as ROS
 nodes, replacing the earlier non-ROS-demo-first order. The updated
 `plans/2026-09-09-sbc-integration-and-avoidance.md` is **in-progress**: publish existing
