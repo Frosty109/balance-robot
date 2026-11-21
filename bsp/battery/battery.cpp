@@ -41,7 +41,8 @@ void Battery::init()
 
 float Battery::read()
 {
-    uint16_t raw { getAverage(cfg_.adc_channel, 4) };
+    constexpr uint8_t SAMPLES_PER_READ {4};
+    uint16_t raw { getAverage(cfg_.adc_channel, SAMPLES_PER_READ) };
     float measured { static_cast<float>(raw) * (VREF / ADC_RESOLUTION) };
     return measured * DIVIDER_RATIO;
 }
@@ -51,7 +52,11 @@ uint16_t Battery::getRaw(uint8_t ch)
     uint16_t timeout { 1000 };
     ADC_RegularChannelConfig(cfg_.adc, ch, 1, ADC_SampleTime_239Cycles5);
     ADC_SoftwareStartConvCmd(cfg_.adc, ENABLE);
-    while(!ADC_GetFlagStatus(cfg_.adc, ADC_FLAG_EOC) && timeout--);
+    // Bounded wait for end of conversion; on timeout, return whatever the register holds.
+    while (!ADC_GetFlagStatus(cfg_.adc, ADC_FLAG_EOC) && timeout > 0)
+    {
+        --timeout;
+    }
     return ADC_GetConversionValue(cfg_.adc);
 }
 
@@ -62,6 +67,6 @@ uint16_t Battery::getAverage(uint8_t ch, uint8_t times)
     {
         total += getRaw(ch);
     }
-    return (times == 4) ? total >> 2 : total / times;
+    return total / times;
 }
 

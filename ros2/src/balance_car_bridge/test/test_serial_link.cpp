@@ -22,13 +22,23 @@ constexpr auto leave = SerialLink::ControlLines::leave;
 class Pty
 {
 public:
+    // On any failure path_ stays empty, which each test checks first.
     Pty()
     {
         master_ = ::posix_openpt(O_RDWR | O_NOCTTY);
-        if (master_ >= 0 && ::grantpt(master_) == 0 && ::unlockpt(master_) == 0)
+        if (master_ < 0)
         {
-            path_ = ::ptsname(master_);
+            return;
         }
+        if (::grantpt(master_) != 0)
+        {
+            return;
+        }
+        if (::unlockpt(master_) != 0)
+        {
+            return;
+        }
+        path_ = ::ptsname(master_);
     }
     ~Pty() { close_master(); }
     Pty(const Pty&) = delete;
@@ -38,7 +48,8 @@ public:
 
     bool write(std::string_view text) const
     {
-        return ::write(master_, text.data(), text.size()) == static_cast<ssize_t>(text.size());
+        const ssize_t written = ::write(master_, text.data(), text.size());
+        return written == static_cast<ssize_t>(text.size());
     }
 
     void close_master()
@@ -57,8 +68,11 @@ private:
 
 bool wait_readable(const SerialLink& link)
 {
+    constexpr nfds_t descriptor_count = 1;
+    constexpr int timeout_ms = 1000;
     pollfd fds {link.native_handle(), POLLIN, 0};
-    return ::poll(&fds, 1, 1000) == 1;
+    const int ready_count = ::poll(&fds, descriptor_count, timeout_ms);
+    return ready_count == 1;
 }
 
 }  // namespace

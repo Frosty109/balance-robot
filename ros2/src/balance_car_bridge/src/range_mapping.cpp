@@ -42,9 +42,10 @@ Msg to_msg(const core::RangeReading& reading,
     return msg;
 }
 
-std::expected<Msg, core::ParseError> range_message(std::string_view line,
-                                                   const builtin_interfaces::msg::Time& receipt_stamp,
-                                                   const std::string& frame_id)
+std::expected<Msg, core::ParseError> range_message(
+    std::string_view line,
+    const builtin_interfaces::msg::Time& receipt_stamp,
+    const std::string& frame_id)
 {
     auto parsed = core::parse_range(line);
     if (!parsed)

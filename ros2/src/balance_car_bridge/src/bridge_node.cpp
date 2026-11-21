@@ -9,6 +9,7 @@
 
 #include <array>
 #include <chrono>
+#include <cstddef>
 #include <exception>
 #include <memory>
 #include <span>
@@ -22,6 +23,9 @@ namespace balance_car::bridge
 
 namespace
 {
+
+constexpr std::chrono::milliseconds poll_period {10};
+constexpr std::size_t max_line_length {256};
 
 // SerialLink has no empty state, so a port that will not open stops the node before it starts.
 SerialLink open_link(const std::string& port)
@@ -47,7 +51,7 @@ public:
         link_ {open_link(port_)},
         publisher_ {create_publisher<balance_car_interfaces::msg::RangeReading>(
             "/car/range", rclcpp::SensorDataQoS())},
-        timer_ {create_wall_timer(std::chrono::milliseconds {10}, [this] { poll_serial(); })}
+        timer_ {create_wall_timer(poll_period, [this] { poll_serial(); })}
     {
         RCLCPP_INFO(get_logger(), "reading %s read-only; publishing /car/range in frame %s",
                     port_.c_str(), frame_id_.c_str());
@@ -63,8 +67,10 @@ private:
             const auto count = link_.read_some(read_buffer_);
             if (!count)
             {
+                const std::string detail = count.error().message();
+                const std::string reason = "Serial read failed on " + port_ + ": " + detail;
                 // Propagates out of spin() to main, which logs it and exits with status 1.
-                throw std::runtime_error {"Serial read failed on " + port_ + ": " + count.error().message()};
+                throw std::runtime_error {reason};
             }
             if (*count == 0)
             {
@@ -81,7 +87,8 @@ private:
     {
         if (event.kind == core::LineEventKind::too_long)
         {
-            RCLCPP_WARN(get_logger(), "discarded a serial line longer than 256 characters");
+            RCLCPP_WARN(get_logger(), "discarded a serial line longer than %zu characters",
+                        max_line_length);
             return;
         }
         if (event.kind != core::LineEventKind::line)
@@ -90,31 +97,33 @@ private:
         }
 
         const std::string_view line = event.line;
+        // printf's %.*s takes the length as an int.
+        const int line_length = static_cast<int>(line.size());
         const auto message = range_message(line, stamp, frame_id_);
         if (message)
         {
-            RCLCPP_DEBUG(get_logger(), "%.*s", static_cast<int>(line.size()), line.data());
+            RCLCPP_DEBUG(get_logger(), "%.*s", line_length, line.data());
             publisher_->publish(*message);
         }
         else if (message.error() != core::ParseError::wrong_line_type)
         {
-            RCLCPP_WARN(get_logger(), "bad RANGE line: %.*s", static_cast<int>(line.size()), line.data());
+            RCLCPP_WARN(get_logger(), "bad RANGE line: %.*s", line_length, line.data());
         }
         else if (core::parse_health(line))
         {
             // Health rows arrive at 10 Hz, so they stay out of the default log level.
-            RCLCPP_DEBUG(get_logger(), "%.*s", static_cast<int>(line.size()), line.data());
+            RCLCPP_DEBUG(get_logger(), "%.*s", line_length, line.data());
         }
         else
         {
-            RCLCPP_INFO(get_logger(), "%.*s", static_cast<int>(line.size()), line.data());
+            RCLCPP_INFO(get_logger(), "%.*s", line_length, line.data());
         }
     }
 
     std::string port_;
     std::string frame_id_;
     SerialLink link_;
-    core::LineBuffer<256> lines_;
+    core::LineBuffer<max_line_length> lines_;
     std::array<char, 512> read_buffer_ {};
     rclcpp::Publisher<balance_car_interfaces::msg::RangeReading>::SharedPtr publisher_;
     rclcpp::TimerBase::SharedPtr timer_;

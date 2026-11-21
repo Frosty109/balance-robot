@@ -50,9 +50,12 @@ public:
             return {LineEventKind::line, {storage_.data(), length}};
         }
 
-        if (used_ < Capacity || (used_ == Capacity && byte == '\r'))
+        const bool has_room = used_ < Capacity;
+        const bool cr_into_spare_byte = used_ == Capacity && byte == '\r';
+        if (has_room || cr_into_spare_byte)
         {
-            storage_[used_++] = byte;
+            storage_[used_] = byte;
+            ++used_;
             return {};
         }
 

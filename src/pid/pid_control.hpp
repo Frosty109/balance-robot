@@ -7,7 +7,9 @@ class BalancePD
         int compute(float angle, float gyro);
 
     private:
-    float kp_, kd_, mid_angle_;
+        float kp_;
+        float kd_;
+        float mid_angle_;
 };
 
 class VelocityPI
@@ -19,8 +21,11 @@ class VelocityPI
         float integral() const { return encoder_integral_; }
 
     private:
-        float kp_, ki_, integral_limit_;
-        float encoder_bias_, encoder_integral_;
+        float kp_;
+        float ki_;
+        float integral_limit_;
+        float encoder_bias_;
+        float encoder_integral_;
 };
 
 class YawRateP
@@ -33,7 +38,8 @@ class YawRateP
                     float measured_yaw_rate_dps) const;
 
     private:
-        float kp_pwm_per_dps_, max_target_dps_;
+        float kp_pwm_per_dps_;
+        float max_target_dps_;
         int max_effort_;
         float ff_pwm_per_dps_;
 };

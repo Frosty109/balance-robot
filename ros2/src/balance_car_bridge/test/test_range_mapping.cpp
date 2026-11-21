@@ -1,6 +1,7 @@
 #include "balance_car_bridge/range_mapping.hpp"
 
 #include <cstdint>
+#include <string_view>
 #include <utility>
 
 #include <gtest/gtest.h>
@@ -14,8 +15,13 @@ using Msg = balance_car_interfaces::msg::RangeReading;
 
 TEST(RangeMapping, CopiesFieldsStampAndFrame)
 {
-    const RangeReading reading {.sequence = 1539, .completed_ms = 123456, .distance_mm = 500,
-                                .status = RangeStatus::valid, .reported_age_ms = 4};
+    const RangeReading reading {
+        .sequence = 1539,
+        .completed_ms = 123456,
+        .distance_mm = 500,
+        .status = RangeStatus::valid,
+        .reported_age_ms = 4,
+    };
     builtin_interfaces::msg::Time stamp;
     stamp.sec = 10;
     stamp.nanosec = 20;
@@ -46,8 +52,8 @@ TEST(RangeMapping, MapsEveryStatusExplicitly)
     {
         RangeReading reading;
         reading.status = status;
-        EXPECT_EQ(to_msg(reading, builtin_interfaces::msg::Time {}, "").status, expected)
-            << "core status " << static_cast<int>(status);
+        const Msg msg = to_msg(reading, builtin_interfaces::msg::Time {}, "");
+        EXPECT_EQ(msg.status, expected) << "core status " << static_cast<int>(status);
     }
 }
 
@@ -57,7 +63,8 @@ TEST(RangeMapping, RangeLineBecomesMessage)
     builtin_interfaces::msg::Time stamp;
     stamp.sec = 7;
 
-    const auto msg = range_message("RANGE v=1 seq=3 t=10 mm=0 st=timeout age=2", stamp, "ultrasonic_link");
+    const std::string_view line {"RANGE v=1 seq=3 t=10 mm=0 st=timeout age=2"};
+    const auto msg = range_message(line, stamp, "ultrasonic_link");
 
     ASSERT_TRUE(msg.has_value());
     EXPECT_EQ(msg->sequence, 3u);
@@ -71,10 +78,11 @@ TEST(RangeMapping, OtherAndBrokenLinesAreErrors)
 {
     const builtin_interfaces::msg::Time stamp;
 
-    EXPECT_EQ(range_message("state=DISARMED angle=12 gz=0 battery=7800 t=100 poll=1 dtmax=5", stamp, "")
-                  .error(),
-              ParseError::wrong_line_type);
-    EXPECT_EQ(range_message("RANGE v=1 seq=1 t=1 mm=0 st=bogus age=0", stamp, "").error(),
-              ParseError::unknown_status);
+    const std::string_view health_line {
+        "state=DISARMED angle=12 gz=0 battery=7800 t=100 poll=1 dtmax=5"};
+    const std::string_view bad_status_line {"RANGE v=1 seq=1 t=1 mm=0 st=bogus age=0"};
+
+    EXPECT_EQ(range_message(health_line, stamp, "").error(), ParseError::wrong_line_type);
+    EXPECT_EQ(range_message(bad_status_line, stamp, "").error(), ParseError::unknown_status);
 }
 

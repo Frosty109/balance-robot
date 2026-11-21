@@ -3,6 +3,18 @@
 #include <cmath>
 #include <cstdio>
 
+namespace
+{
+    // Telemetry prints fixed-point integers: hundredths for angles, tenths for rates.
+    int hundredths(float value) { return (int)(value * 100); }
+    int tenths(float value) { return (int)(value * 10); }
+
+    bool beyond(float angle, float limit)
+    {
+        return angle < -limit || angle > limit;
+    }
+}
+
 AppControl::AppControl(ISensorHal& sensor,
                        IMotorHal& motor,
                        IMonotonicClock& clock,
@@ -81,16 +93,17 @@ void AppControl::update(float move_x, float target_yaw_rate_dps)
 
         if (after - last_fresh_ms_ >= STALE_TIMEOUT_MS)
         {
-            // Motors first: the print busy-waits on the USART for ~3 ms, so reporting
-            // before stopping would timestamp a shutdown that has not happened yet.
-            // stale branch,
+            // Motors first: the print busy-waits ~3 ms, so printing first would
+            // timestamp a shutdown that has not happened yet.
             disarm("stale");
             rejectPendingArm("stale");
 
             if (!stale_)
             {
                 stale_ = true;
-                printf("STALE last=%lu now=%lu\n", (unsigned long)last_fresh_ms_, (unsigned long)after);
+                printf("STALE last=%lu now=%lu\n",
+                       (unsigned long)last_fresh_ms_,
+                       (unsigned long)after);
             }
         }
 
@@ -120,9 +133,10 @@ void AppControl::update(float move_x, float target_yaw_rate_dps)
     static constexpr float FAULT_ANGLE {40.0f};
     static constexpr float CLEAR_ANGLE {10.0f};
 
+    // Hysteresis: a fault trips past 40 degrees and clears only inside 10.
     const float limit = faulted_ ? CLEAR_ANGLE : FAULT_ANGLE;
 
-    if (angle < -limit || angle > limit)
+    if (beyond(angle, limit))
     {
         disarm("angle");
         rejectPendingArm("angle");
@@ -131,7 +145,7 @@ void AppControl::update(float move_x, float target_yaw_rate_dps)
         if (!faulted_)
         {
             faulted_ = true;
-            printf("FAULT angle=%d\n", (int)(angle * 100));
+            printf("FAULT angle=%d\n", hundredths(angle));
         }
         return;
     }
@@ -139,20 +153,21 @@ void AppControl::update(float move_x, float target_yaw_rate_dps)
     if (faulted_)
     {
         faulted_ = false;
-        printf("RECOVERED angle=%d\n", (int)(angle * 100));
+        printf("RECOVERED angle=%d\n", hundredths(angle));
         rejectPendingArm("recovering");
     }
 
     if (stale_)
     {
-        if (angle < -CLEAR_ANGLE || angle > CLEAR_ANGLE)
+        if (beyond(angle, CLEAR_ANGLE))
         {
             consecutive_fresh_ = 0;
             rejectPendingArm("recovering");
             return;
         }
 
-        if (++consecutive_fresh_ < RECOVERY_FRESH_SAMPLES)
+        ++consecutive_fresh_;
+        if (consecutive_fresh_ < RECOVERY_FRESH_SAMPLES)
         {
             rejectPendingArm("recovering");
             return;
@@ -166,16 +181,16 @@ void AppControl::update(float move_x, float target_yaw_rate_dps)
     {
         arm_requested_ = false;
 
-        if (angle < -CLEAR_ANGLE || angle > CLEAR_ANGLE)
+        if (beyond(angle, CLEAR_ANGLE))
         {
-            printf("ARM REJECTED reason=angle angle=%d\n", (int)(angle * 100));
+            printf("ARM REJECTED reason=angle angle=%d\n", hundredths(angle));
         }
         else
         {
             velocity_.reset();
             resetTelemetryWindow();
             armed_ = true;
-            printf("ARMED angle=%d\n", (int)(angle * 100));
+            printf("ARMED angle=%d\n", hundredths(angle));
         }
     }
 
@@ -183,16 +198,17 @@ void AppControl::update(float move_x, float target_yaw_rate_dps)
     {
         motor_.setMotorPWM(0, 0);
 
-        if (++telemetry_tick_ >= TELEMETRY_DECIMATION)
+        ++telemetry_tick_;
+        if (telemetry_tick_ >= TELEMETRY_DECIMATION)
         {
             telemetry_tick_ = 0;
             printf("state=DISARMED angle=%d gz=%d battery=%d t=%lu poll=%lu dtmax=%lu\n",
-                 (int)(angle * 100), 
-                 (int)(sensor_.getYawRateDps() * 10),
-                 (int)(battery * 100),
-                 (unsigned long)clock_.nowMs(),
-                 (unsigned long)max_poll_ms_,
-                 (unsigned long)max_fresh_interval_ms_);
+                   hundredths(angle),
+                   tenths(sensor_.getYawRateDps()),
+                   hundredths(battery),
+                   (unsigned long)clock_.nowMs(),
+                   (unsigned long)max_poll_ms_,
+                   (unsigned long)max_fresh_interval_ms_);
         }
         return;
     }
@@ -211,24 +227,29 @@ void AppControl::update(float move_x, float target_yaw_rate_dps)
     int right = balance + velocity + turn;
     motor_.setMotorPWM(left, right);
 
-    if (++telemetry_tick_ >= TELEMETRY_DECIMATION)
+    ++telemetry_tick_;
+    if (telemetry_tick_ >= TELEMETRY_DECIMATION)
     {
         telemetry_tick_ = 0;
-        // poll= is the worst-case poll duration since boot. It stays in the line
-        // because the stale deadline is only meaningful while poll() returns well
-        // inside STALE_TIMEOUT_MS; this is the only thing watching that.
-        // enc_* are summed over the whole window: a single 5 ms delta per 100 ms
-        // line is too sparse to read a sign from by hand.
-        // i= is the clamped integral state. It cannot be derived from the other
-        // fields: at the limits used early in the Stage 7 walk, the error in
-        // estimating the P term is as large as the whole integral contribution.
+        const long forward_mm_s = std::lround(move_x / MOVE_X_PER_MM_S);
+
+        // poll= is the worst poll since boot: the stale deadline needs it well under STALE_TIMEOUT_MS.
+        // enc_* sum the whole window: one 5 ms delta per 100 ms line is too sparse to read a sign from.
+        // i= is the clamped integral; at early Stage 7 limits it cannot be estimated from the other fields.
         printf("angle=%d bal=%d i=%d tr=%d vx=%ld wz=%d gz=%d L=%d R=%d enc_l=%d enc_r=%d t=%lu poll=%lu\n",
-             (int)(angle * 100), balance, (int)velocity_.integral(),
-             turn, std::lround(move_x / MOVE_X_PER_MM_S), (int)(target_yaw_rate_dps * 10),
-             (int)(yaw_rate_dps * 10),
-             left, right, enc_l_sum_, enc_r_sum_,
-             (unsigned long)clock_.nowMs(),
-             (unsigned long)max_poll_ms_);
+               hundredths(angle),
+               balance,
+               (int)velocity_.integral(),
+               turn,
+               forward_mm_s,
+               tenths(target_yaw_rate_dps),
+               tenths(yaw_rate_dps),
+               left,
+               right,
+               enc_l_sum_,
+               enc_r_sum_,
+               (unsigned long)clock_.nowMs(),
+               (unsigned long)max_poll_ms_);
         enc_l_sum_ = 0;
         enc_r_sum_ = 0;
     }

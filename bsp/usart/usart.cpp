@@ -82,26 +82,28 @@ void Usart::sendByte(uint8_t ch)
 
 void Usart::sendBytes(uint8_t* data, uint16_t length)
 {
-    while (length--)
-        sendByte(*data++);
+    for (uint16_t i = 0; i < length; ++i)
+    {
+        sendByte(data[i]);
+    }
 }
 
 extern "C" int fputc(int ch, FILE* f)
 {
-    while ((USART1->SR & 0x80) == 0);
+    while ((USART1->SR & USART_FLAG_TXE) == 0);     // wait for an empty transmit register
     USART1->DR = (uint8_t)ch;
     return ch;
 }
 
-// newlib (GCC) calls _write for all stdout; Keil calls fputc above
-// __GNUC__ too, exclude explicitly, GCC-only path.
+// newlib (GCC) calls _write for all stdout; Keil calls fputc above.
+// Arm Compiler 6 also defines __GNUC__, so exclude it explicitly.
 #if defined(__GNUC__) && !defined(__ARMCC_VERSION)
 extern "C" int _write(int fd, char* buf, int len)
 {
     (void)fd;
-    for (int i = 0; i < len; i++) 
+    for (int i = 0; i < len; i++)
     {
-        while ((USART1->SR & 0x80) == 0);
+        while ((USART1->SR & USART_FLAG_TXE) == 0);
         USART1->DR = (uint8_t)buf[i];
     }
     return len;
@@ -128,11 +130,15 @@ void Usart::enableOperatorCommands()
 
 extern "C" void USART1_IRQHandler(void)
 {
-    // F103 clears ORE/FE/NE/PE as part of the status-then-data read, so SR must be captured before draining DR.
+    // The F103 clears ORE/FE/NE/PE on the SR-then-DR read, so capture SR before draining DR.
     const uint16_t sr   { USART1->SR };
     const uint8_t  byte { (uint8_t)USART_ReceiveData(USART1) };
 
-    const uint16_t entry = static_cast<uint16_t>(byte | ((sr & RECEIVE_ERRORS) != 0 ? RxRing::ERROR_BIT : 0));
+    uint16_t entry = byte;
+    if ((sr & RECEIVE_ERRORS) != 0)
+    {
+        entry |= RxRing::ERROR_BIT;
+    }
     if (!rx_ring_.push(entry)) { rx_overflow_ = true; }
 }
 

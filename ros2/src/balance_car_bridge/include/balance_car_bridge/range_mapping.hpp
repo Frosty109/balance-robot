@@ -19,7 +19,8 @@ namespace balance_car::bridge
     const std::string& frame_id);
 
 // A RANGE line as a message; other lines give ParseError::wrong_line_type, broken ones another error.
-[[nodiscard]] std::expected<balance_car_interfaces::msg::RangeReading, core::ParseError> range_message(
+[[nodiscard]] std::expected<balance_car_interfaces::msg::RangeReading, core::ParseError>
+range_message(
     std::string_view line,
     const builtin_interfaces::msg::Time& receipt_stamp,
     const std::string& frame_id);

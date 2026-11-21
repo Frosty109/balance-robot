@@ -11,7 +11,9 @@ int BalancePD::compute(float angle, float gyro)
 {
     float angle_bias = mid_angle_ - angle;
     float gyro_bias = 0 - gyro;
-    return static_cast<int>(-kp_ / 100.0f * angle_bias - gyro_bias * kd_ / 100.0f);
+    const float p_term = -kp_ / 100.0f * angle_bias;
+    const float d_term = gyro_bias * kd_ / 100.0f;
+    return static_cast<int>(p_term - d_term);
 }
 
 // Velocity PI 
@@ -24,6 +26,7 @@ VelocityPI::VelocityPI(float kp, float ki, float integral_limit)
 int VelocityPI::compute(int encoder_left, int encoder_right, float move_x)
 {
     float encoder_least = 0 - (encoder_left + encoder_right);
+    // First-order low-pass on the speed error: keep 84% of the old value, add 16% of the new.
     encoder_bias_ *= 0.84f;
     encoder_bias_ += encoder_least * 0.16f;
     encoder_integral_ += encoder_bias_;
@@ -38,7 +41,9 @@ int VelocityPI::compute(int encoder_left, int encoder_right, float move_x)
         encoder_integral_ = -integral_limit_;
     }
 
-    return -encoder_bias_ * kp_ / 100.0f - encoder_integral_ * ki_ / 100.0f;
+    const float p_term = -encoder_bias_ * kp_ / 100.0f;
+    const float i_term = encoder_integral_ * ki_ / 100.0f;
+    return static_cast<int>(p_term - i_term);
 }
 
 void VelocityPI::reset()

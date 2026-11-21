@@ -60,19 +60,20 @@ int Encoder::read()
 }
 
 extern "C" {
+    // Counter overflow is not used: read() drains CNT, so these only clear the update flag.
     void TIM3_IRQHandler(void)
     {
-        if(TIM3->SR & 0x0001)
+        if(TIM3->SR & TIM_FLAG_Update)
         {
         }
-        TIM3->SR &= ~(1 << 0);
+        TIM3->SR &= ~TIM_FLAG_Update;
     }
 
     void TIM4_IRQHandler(void)
     {
-        if(TIM4->SR & 0x0001)
+        if(TIM4->SR & TIM_FLAG_Update)
         {
         }
-        TIM4->SR &= ~(1 << 0);
+        TIM4->SR &= ~TIM_FLAG_Update;
     }
 }

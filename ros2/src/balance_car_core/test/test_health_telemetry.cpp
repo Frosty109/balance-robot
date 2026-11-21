@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <optional>
@@ -35,16 +36,28 @@ std::string change_field(std::string_view line, std::string_view key,
                          std::optional<std::string_view> value)
 {
     std::string result {line};
-    const auto token = std::string {key} + '=';
-    const auto begin = result.starts_with(token) ? 0u : result.find(' ' + token) + 1;
-    const auto end = result.find(' ', begin);
-    const auto length = (end == std::string::npos ? result.size() : end) - begin;
+    const std::string token = std::string {key} + '=';
+
+    // Searching for " key=" stops "t=" matching inside "dtmax=".
+    std::size_t begin = 0;
+    if (!result.starts_with(token))
+        begin = result.find(' ' + token) + 1;
+
+    const std::size_t end = result.find(' ', begin);
+    const bool is_last_field = end == std::string::npos;
+    std::size_t field_end = end;
+    if (is_last_field)
+        field_end = result.size();
+    const std::size_t length = field_end - begin;
+
     if (value)
         result.replace(begin, length, token + std::string {*value});
-    else if (end != std::string::npos)
-        result.erase(begin, length + 1);
+    else if (!is_last_field)
+        result.erase(begin, length + 1);  // the field and the space after it
+    else if (begin == 0)
+        result.erase(0);  // the only field
     else
-        result.erase(begin == 0 ? 0 : begin - 1);
+        result.erase(begin - 1);  // the space before the field, and the field
     return result;
 }
 
@@ -105,10 +118,13 @@ TEST(HealthTelemetryTest, RequiresEachFieldExactlyOnce)
         {
             const std::string_view token {part.begin(), part.end()};
             const auto key = token.substr(0, token.find('='));
-            expect_error(std::string {line} + ' ' + std::string {token},
-                         ParseError::duplicate_field);
-            expect_error(change_field(line, key, std::nullopt),
-                         key == "state" ? ParseError::malformed_field : ParseError::missing_field);
+            const std::string repeated = std::string {line} + ' ' + std::string {token};
+            expect_error(repeated, ParseError::duplicate_field);
+
+            // Without state= the disarmed row reads as armed, where battery and dtmax are invalid.
+            const auto removed_error =
+                key == "state" ? ParseError::malformed_field : ParseError::missing_field;
+            expect_error(change_field(line, key, std::nullopt), removed_error);
         }
     }
 }
@@ -161,7 +177,9 @@ TEST(HealthTelemetryTest, RejectsMalformedFieldsAndControlBytes)
         expect_error(std::string {disarmed_line} + suffix, ParseError::malformed_field);
     for (const char* key : {"state", "angle", "battery", "t"})
         expect_error(change_field(disarmed_line, key, ""), ParseError::malformed_field);
-    for (const char byte : {'\r', '\n', '\t', '\0', static_cast<char>(0x7f), static_cast<char>(0xff)})
+    constexpr char delete_byte = static_cast<char>(0x7f);
+    constexpr char non_ascii_byte = static_cast<char>(0xff);
+    for (const char byte : {'\r', '\n', '\t', '\0', delete_byte, non_ascii_byte})
     {
         expect_error(std::string {disarmed_line} + byte, ParseError::malformed_field);
         expect_error(std::string {disarmed_line} + " extra=x" + byte, ParseError::malformed_field);

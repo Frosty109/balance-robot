@@ -58,8 +58,15 @@ SerialLink::open_read_only(const std::string& path, ControlLines lines)
     attrs.c_cflag = CS8 | CREAD | CLOCAL;
     attrs.c_lflag = 0;
 
-    if (::cfsetispeed(&attrs, B115200) != 0 || ::cfsetospeed(&attrs, B115200) != 0
-        || ::tcsetattr(fd, TCSANOW, &attrs) != 0)
+    if (::cfsetispeed(&attrs, B115200) != 0)
+    {
+        return std::unexpected(last_error());
+    }
+    if (::cfsetospeed(&attrs, B115200) != 0)
+    {
+        return std::unexpected(last_error());
+    }
+    if (::tcsetattr(fd, TCSANOW, &attrs) != 0)
     {
         return std::unexpected(last_error());
     }

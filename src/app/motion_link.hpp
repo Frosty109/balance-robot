@@ -18,8 +18,12 @@ constexpr std::uint8_t crc8(const char* data, std::size_t length)
         crc ^= static_cast<std::uint8_t>(data[i]);
         for (int bit = 0; bit < 8; ++bit)
         {
-            crc = (crc & 0x80) ? static_cast<std::uint8_t>((crc << 1) ^ 0x07)
-                               : static_cast<std::uint8_t>(crc << 1);
+            const bool top_bit_set = (crc & 0x80) != 0;
+            crc = static_cast<std::uint8_t>(crc << 1);
+            if (top_bit_set)
+            {
+                crc ^= 0x07;
+            }
         }
     }
     return crc;
@@ -76,7 +80,8 @@ public:
 
     explicit MotionGovernor(Limits limits) : limits_(limits) {}
 
-    bool onCommand(std::uint8_t seq, MotionTarget requested, std::uint32_t now_ms); // false = repeat/old seq
+    // Returns false for a repeated or older seq, which is ignored.
+    bool onCommand(std::uint8_t seq, MotionTarget requested, std::uint32_t now_ms);
     MotionTarget step(bool armed, std::uint32_t now_ms);
     bool linkAlive(std::uint32_t now_ms) const;
     void reset();

@@ -26,6 +26,21 @@ std::optional<ParseError> error_of(std::string_view line)
     return result.error();
 }
 
+void parse_chunk(LineBuffer<>& buffer, std::string_view chunk, std::vector<StateEvent>& events)
+{
+    for (const char byte : chunk)
+    {
+        const auto framed = buffer.feed(byte);
+        ASSERT_NE(framed.kind, LineEventKind::too_long);
+        if (framed.kind == LineEventKind::line)
+        {
+            const auto event = parse_state_event(framed.line);
+            ASSERT_TRUE(event.has_value());
+            events.push_back(*event);
+        }
+    }
+}
+
 }  // namespace
 
 TEST(StateEventTest, ParsesBoot)
@@ -203,23 +218,9 @@ TEST(StateEventTest, ParsesEventsFromFragmentedCrLfInput)
 {
     LineBuffer<> buffer;
     std::vector<StateEvent> events;
-    const auto feed = [&](std::string_view chunk)
-    {
-        for (const char byte : chunk)
-        {
-            const auto framed = buffer.feed(byte);
-            ASSERT_NE(framed.kind, LineEventKind::too_long);
-            if (framed.kind == LineEventKind::line)
-            {
-                const auto event = parse_state_event(framed.line);
-                ASSERT_TRUE(event.has_value());
-                events.push_back(*event);
-            }
-        }
-    };
 
-    feed("BOOT\r\nARM");
-    feed("ED angle=-20\r\nDISARMED reason=operator\n");
+    parse_chunk(buffer, "BOOT\r\nARM", events);
+    parse_chunk(buffer, "ED angle=-20\r\nDISARMED reason=operator\n", events);
 
     ASSERT_EQ(events.size(), 3u);
     EXPECT_EQ(events[0].kind, StateEventKind::boot);

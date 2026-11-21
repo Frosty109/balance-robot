@@ -6,9 +6,9 @@ enum class OperatorCommand { None, Arm, Disarm };
 
 constexpr OperatorCommand decodeOperatorByte(std::uint8_t byte, bool receive_error)
 {
-    return !receive_error && byte == 'a'
-         ? OperatorCommand::Arm
-         : OperatorCommand::Disarm;
+    if (receive_error) { return OperatorCommand::Disarm; }
+    if (byte == 'a')   { return OperatorCommand::Arm; }
+    return OperatorCommand::Disarm;             // any other byte disarms
 }
 
 constexpr OperatorCommand resolveOperatorCommands(bool arm, bool disarm)

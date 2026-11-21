@@ -5,6 +5,9 @@
 #include <gtest/gtest.h>
 #include <string>
 
+// The app's stale deadline, pinned here so a change to it shows up as a test failure.
+static constexpr std::uint32_t STALE_TIMEOUT_MS {25};
+
 class MockMonotonicClock : public IMonotonicClock
 {
 public:
@@ -386,7 +389,9 @@ TEST(AppControlTest, TelemetrySumsEncoderCountsAcrossTheWindow)
     sensor.fresh = false;
     testing::internal::CaptureStdout();
     for (int i = 0; i < 10; ++i) { app.update(); }
-    EXPECT_TRUE(testing::internal::GetCapturedStdout().empty());
+    const std::string rejected = testing::internal::GetCapturedStdout();
+
+    EXPECT_TRUE(rejected.empty());
 
     sensor.fresh = true;
     sensor.enc_l = 1;
@@ -481,7 +486,7 @@ TEST(AppControlTest, ShutdownAtExactDeadline)
     ASSERT_EQ(motor.set_calls, 1);
 
     sensor.fresh = false;
-    clock.advance(25);             // elapsed exactly STALE_TIMEOUT_MS
+    clock.advance(STALE_TIMEOUT_MS);   // elapsed exactly at the deadline
     app.update();
 
     EXPECT_EQ(motor.set_calls, 2);
@@ -532,7 +537,7 @@ TEST(AppControlTest, StaleResetsVelocityState)
 
     // Tested clears its integral by going stale; reference clears it explicitly.
     tested_sensor.fresh = false;
-    tested_clock.advance(25);
+    tested_clock.advance(STALE_TIMEOUT_MS);
     tested_app.update();
     reference_app.reset();
 
@@ -576,7 +581,7 @@ TEST(AppControlTest, RecoveryRequiresThreeConsecutiveFresh)
     ASSERT_EQ(motor.last_left, 10);
 
     sensor.fresh = false;
-    clock.advance(25);
+    clock.advance(STALE_TIMEOUT_MS);
     app.update();
     ASSERT_EQ(motor.last_left, 0);
 
@@ -622,7 +627,7 @@ TEST(AppControlTest, RecoveryCounterResetsOnRejectedPoll)
     ASSERT_EQ(motor.last_left, 10);
 
     sensor.fresh = false;
-    clock.advance(25);
+    clock.advance(STALE_TIMEOUT_MS);
     app.update();
     ASSERT_EQ(motor.last_left, 0);
 
@@ -672,7 +677,7 @@ TEST(AppControlTest, RecoveryRejectedWhenAngleUnsafe)
     ASSERT_EQ(sensor.encoder_left_reads, 1);
 
     sensor.fresh = false;
-    clock.advance(25);
+    clock.advance(STALE_TIMEOUT_MS);
     app.update();
     ASSERT_EQ(motor.set_calls, 2);
     ASSERT_EQ(motor.last_left, 0);
@@ -710,7 +715,7 @@ TEST(AppControlTest, RecoveryCounterResetsOnUnsafeAngle)
     ASSERT_EQ(motor.last_left, 10);
 
     sensor.fresh = false;
-    clock.advance(25);
+    clock.advance(STALE_TIMEOUT_MS);
     app.update();
     ASSERT_EQ(motor.last_left, 0);
 
@@ -763,7 +768,7 @@ TEST(AppControlTest, RecoveryCounterResetsOnAngleFault)
     ASSERT_EQ(motor.last_left, 10);
 
     sensor.fresh = false;
-    clock.advance(25);
+    clock.advance(STALE_TIMEOUT_MS);
     app.update();
     ASSERT_EQ(motor.last_left, 0);
 
@@ -847,7 +852,7 @@ TEST(AppControlTest, StaleEntryPrintsOnce)
     ASSERT_EQ(motor.set_calls, 1);
 
     sensor.fresh = false;
-    clock.advance(25);
+    clock.advance(STALE_TIMEOUT_MS);
 
     testing::internal::CaptureStdout();
 
@@ -858,15 +863,9 @@ TEST(AppControlTest, StaleEntryPrintsOnce)
 
     const std::string output = testing::internal::GetCapturedStdout();
 
-    std::string::size_type stale_lines = 0;
-    for (std::string::size_type pos = output.find("STALE");
-         pos != std::string::npos;
-         pos = output.find("STALE", pos + 1))
-    {
-        ++stale_lines;
-    }
+    const int stale_lines = countOccurrences(output, "STALE");
 
-    EXPECT_EQ(stale_lines, 1u);                // report is one-shot
+    EXPECT_EQ(stale_lines, 1);                 // report is one-shot
     EXPECT_EQ(motor.set_calls, 201);                 // shutdown re-asserts
     EXPECT_EQ(motor.last_left, 0);
     EXPECT_EQ(motor.last_right, 0);
@@ -936,7 +935,7 @@ TEST(AppControlTest, StaleBacklogIsDiscardedOnRecovery)
     sensor.counts_per_poll_l = 100;
     sensor.counts_per_poll_r = 100;
 
-    clock.advance(25);
+    clock.advance(STALE_TIMEOUT_MS);
     app.update();                              // STALE at the exact deadline
 
     for (int i = 0; i < 49; ++i)
@@ -1081,7 +1080,7 @@ TEST(AppControlTest, NoRestartAfterStaleRecovery)
     EXPECT_EQ(motor.last_left, 10);
 
     sensor.fresh = false;
-    clock.advance(25);
+    clock.advance(STALE_TIMEOUT_MS);
 
     testing::internal::CaptureStdout();
     app.update();                              // STALE at the exact deadline, disarms
@@ -1258,7 +1257,7 @@ TEST(AppControlTest, ArmRejectedWhileStaleRecovering)
     ASSERT_EQ(motor.last_left, 10);
 
     sensor.fresh = false;
-    clock.advance(25);
+    clock.advance(STALE_TIMEOUT_MS);
     app.update();                              // STALE
     ASSERT_EQ(motor.last_left, 0);
 
@@ -1450,8 +1449,11 @@ TEST(AppControlTest, RepeatedArmRequestIsNoOp)
     for (int i = 0; i < 18; ++i) { reference_app.update(); }
     const std::string reference_output = testing::internal::GetCapturedStdout();
 
+    // The leading newline lets a match on the first line count as a line start too.
+    const std::string tested_lines = "\n" + tested_output;
+
     EXPECT_TRUE(tested_app.armed());
-    EXPECT_EQ(countOccurrences("\n" + tested_output, "\nARMED angle="), 0);
+    EXPECT_EQ(countOccurrences(tested_lines, "\nARMED angle="), 0);
     EXPECT_EQ(countOccurrences(tested_output, "bal="), 1);     // 2 + 18 = one full window
     EXPECT_EQ(tested_output, reference_output);
     EXPECT_EQ(tested_motor.last_left, reference_motor.last_left);
@@ -1564,7 +1566,7 @@ TEST(AppControlTest, StaleDisarms)
 
     testing::internal::CaptureStdout();
     sensor.fresh = false;
-    clock.advance(25);
+    clock.advance(STALE_TIMEOUT_MS);
     app.update();                              // deadline: disarms
     const std::string output = testing::internal::GetCapturedStdout();
 
@@ -1628,8 +1630,11 @@ TEST(AppControlTest, TurnDoesNotAlterPreClampCommonSum)
     app.requestArm();
     app.update();
 
-    EXPECT_EQ(motor.last_left + motor.last_right, 20);
-    EXPECT_EQ(motor.last_right - motor.last_left, -20);
+    const int common_sum = motor.last_left + motor.last_right;
+    const int wheel_differential = motor.last_right - motor.last_left;
+
+    EXPECT_EQ(common_sum, 20);
+    EXPECT_EQ(wheel_differential, -20);
 }
 
 TEST(AppControlTest, DisarmedTargetCannotDrive)
@@ -1692,7 +1697,7 @@ TEST(AppControlTest, StaleFaultBeatsTurnTarget)
     ASSERT_TRUE(app.armed());
 
     sensor.fresh = false;
-    clock.advance(25);
+    clock.advance(STALE_TIMEOUT_MS);
     app.update(0.0f, 30.0f);                   // deadline: disarms
 
     EXPECT_FALSE(app.armed());

@@ -18,6 +18,9 @@ LinkEvent feedAll(FrameParser& parser, const char* text)
 // Stage 10 starting limits from plan §2: ±100 mm/s, ±30 deg/s, 200 mm/s², 60 deg/s², 250 ms.
 const MotionGovernor::Limits LIMITS {100.0f, 30.0f, 200.0f, 60.0f, 250};
 
+// Float slack for governor outputs, in mm/s or deg/s.
+constexpr float TOLERANCE {1e-3f};
+
 // Sends a fresh command and steps the governor every 10 ms; returns the last output.
 MotionTarget holdCommand(MotionGovernor& governor, std::uint8_t& seq, MotionTarget request,
                          std::uint32_t from_ms, std::uint32_t to_ms)
@@ -155,7 +158,8 @@ TEST(MotionGovernorTest, DisarmedOutputsZeroAndResets)
 {
     MotionGovernor governor {LIMITS};
     std::uint8_t seq = 0;
-    EXPECT_NEAR(holdCommand(governor, seq, {100.0f, 0.0f}, 0, 500).forward_mm_s, 100.0f, 1e-3f);
+    const MotionTarget held = holdCommand(governor, seq, {100.0f, 0.0f}, 0, 500);
+    EXPECT_NEAR(held.forward_mm_s, 100.0f, TOLERANCE);
 
     EXPECT_FLOAT_EQ(governor.step(false, 510).forward_mm_s, 0.0f);
     EXPECT_FLOAT_EQ(governor.step(true, 520).forward_mm_s, 0.0f);   // the old command is gone
@@ -176,14 +180,14 @@ TEST(MotionGovernorTest, ClampsSymmetrically)
     MotionGovernor forward {LIMITS};
     std::uint8_t seq = 0;
     MotionTarget out = holdCommand(forward, seq, {1000.0f, 1000.0f}, 0, 1000);
-    EXPECT_NEAR(out.forward_mm_s, 100.0f, 1e-3f);
-    EXPECT_NEAR(out.yaw_rate_dps, 30.0f, 1e-3f);
+    EXPECT_NEAR(out.forward_mm_s, 100.0f, TOLERANCE);
+    EXPECT_NEAR(out.yaw_rate_dps, 30.0f, TOLERANCE);
 
     MotionGovernor reverse {LIMITS};
     seq = 0;
     out = holdCommand(reverse, seq, {-1000.0f, -1000.0f}, 0, 1000);
-    EXPECT_NEAR(out.forward_mm_s, -100.0f, 1e-3f);
-    EXPECT_NEAR(out.yaw_rate_dps, -30.0f, 1e-3f);
+    EXPECT_NEAR(out.forward_mm_s, -100.0f, TOLERANCE);
+    EXPECT_NEAR(out.yaw_rate_dps, -30.0f, TOLERANCE);
 }
 
 TEST(MotionGovernorTest, SlewLimitsRise)
@@ -191,7 +195,8 @@ TEST(MotionGovernorTest, SlewLimitsRise)
     MotionGovernor governor {LIMITS};
     std::uint8_t seq = 0;
     // 100 ms at 200 mm/s² is 20 mm/s; the first step at t=0 has dt 0.
-    EXPECT_NEAR(holdCommand(governor, seq, {100.0f, 0.0f}, 0, 100).forward_mm_s, 20.0f, 1e-3f);
+    const MotionTarget out = holdCommand(governor, seq, {100.0f, 0.0f}, 0, 100);
+    EXPECT_NEAR(out.forward_mm_s, 20.0f, TOLERANCE);
 }
 
 TEST(MotionGovernorTest, TimeoutReturnsTargetToZeroWithSlew)
@@ -205,10 +210,10 @@ TEST(MotionGovernorTest, TimeoutReturnsTargetToZeroWithSlew)
     {
         out = governor.step(true, t);
     }
-    EXPECT_NEAR(out.forward_mm_s, 100.0f, 1e-3f);           // age 240 ms: still alive
+    EXPECT_NEAR(out.forward_mm_s, 100.0f, TOLERANCE);           // age 240 ms: still alive
 
-    EXPECT_NEAR(governor.step(true, 750).forward_mm_s, 98.0f, 1e-3f);   // age 250 ms: lost
-    EXPECT_NEAR(governor.step(true, 760).forward_mm_s, 96.0f, 1e-3f);
+    EXPECT_NEAR(governor.step(true, 750).forward_mm_s, 98.0f, TOLERANCE);   // age 250 ms: lost
+    EXPECT_NEAR(governor.step(true, 760).forward_mm_s, 96.0f, TOLERANCE);
 }
 
 TEST(MotionGovernorTest, FirstStepAfterResetHasZeroDt)
@@ -216,7 +221,7 @@ TEST(MotionGovernorTest, FirstStepAfterResetHasZeroDt)
     MotionGovernor governor {LIMITS};
     governor.onCommand(1, {100.0f, 0.0f}, 1000);
     EXPECT_FLOAT_EQ(governor.step(true, 1000).forward_mm_s, 0.0f);
-    EXPECT_NEAR(governor.step(true, 1010).forward_mm_s, 2.0f, 1e-3f);
+    EXPECT_NEAR(governor.step(true, 1010).forward_mm_s, 2.0f, TOLERANCE);
 }
 
 TEST(MotionGovernorTest, LongGapDtIsCapped)
@@ -226,7 +231,7 @@ TEST(MotionGovernorTest, LongGapDtIsCapped)
     governor.step(true, 0);
     governor.onCommand(2, {100.0f, 0.0f}, 5000);
     // A 5 s gap is capped at 50 ms: 50 ms at 200 mm/s² is 10 mm/s.
-    EXPECT_NEAR(governor.step(true, 5000).forward_mm_s, 10.0f, 1e-3f);
+    EXPECT_NEAR(governor.step(true, 5000).forward_mm_s, 10.0f, TOLERANCE);
 }
 
 TEST(MotionGovernorTest, DuplicateSeqRejected)

@@ -9,6 +9,18 @@ extern "C" {
     #include "DMP/inv_mpu_dmp_motion_driver.h"
 }
 
+namespace
+{
+    constexpr float RAD_TO_DEG {57.3f};
+
+    constexpr unsigned short DMP_FEATURES {
+        DMP_FEATURE_6X_LP_QUAT | DMP_FEATURE_TAP | DMP_FEATURE_ANDROID_ORIENT |
+        DMP_FEATURE_SEND_RAW_ACCEL | DMP_FEATURE_SEND_CAL_GYRO | DMP_FEATURE_GYRO_CAL};
+
+    // mpu_run_self_test() result bits: gyro 0x1, accel 0x2, compass 0x4.
+    constexpr int ALL_SELF_TESTS_PASSED {0x7};
+}
+
 Imu::Imu()
     : pitch_(0.0f), roll_(0.0f), yaw_(0.0f)
     , q0_(1.0f), q1_(0.0f), q2_(0.0f), q3_(0.0f)
@@ -31,19 +43,18 @@ bool Imu::init()
 
     if (mpu_init()) return false;
 
-    if(mpu_set_sensors(INV_XYZ_GYRO | INV_XYZ_ACCEL))        return false;
-    if(mpu_configure_fifo(INV_XYZ_GYRO | INV_XYZ_ACCEL))     return false;
-    if(mpu_set_sample_rate(DEFAULT_MPU_HZ))                    return false;
-    if(dmp_load_motion_driver_firmware())                      return false;
-    if(dmp_set_orientation(
-        inv_orientation_matrix_to_scalar(GYRO_ORIENTATION)))   return false;
-    if(dmp_enable_feature(DMP_FEATURE_6X_LP_QUAT |
-        DMP_FEATURE_TAP | DMP_FEATURE_ANDROID_ORIENT |
-        DMP_FEATURE_SEND_RAW_ACCEL | DMP_FEATURE_SEND_CAL_GYRO |
-        DMP_FEATURE_GYRO_CAL))                                 return false;
-    if(dmp_set_fifo_rate(DEFAULT_MPU_HZ))                      return false;
+    // The InvenSense calls return 0 on success.
+    const unsigned char sensors = INV_XYZ_GYRO | INV_XYZ_ACCEL;
+    const unsigned short orientation = inv_orientation_matrix_to_scalar(GYRO_ORIENTATION);
+    if (mpu_set_sensors(sensors))                 return false;
+    if (mpu_configure_fifo(sensors))              return false;
+    if (mpu_set_sample_rate(DEFAULT_MPU_HZ))      return false;
+    if (dmp_load_motion_driver_firmware())        return false;
+    if (dmp_set_orientation(orientation))         return false;
+    if (dmp_enable_feature(DMP_FEATURES))         return false;
+    if (dmp_set_fifo_rate(DEFAULT_MPU_HZ))        return false;
     run_self_test();
-    if(mpu_set_dmp_state(1))                                   return false;
+    if (mpu_set_dmp_state(1))                     return false;
 
     return true;
 
@@ -80,16 +91,17 @@ bool Imu::read()
     const float q2 = quat[2] / q30;
     const float q3 = quat[3] / q30;
 
+    // Quaternion to Euler angles, in degrees.
     const float roll  =
-        asin(-2 * q1 * q3 + 2 * q0 * q2) * 57.3f;
+        asin(-2 * q1 * q3 + 2 * q0 * q2) * RAD_TO_DEG;
 
     const float pitch =
         atan2(2 * q2 * q3 + 2 * q0 * q1,
-             -2 * q1 * q1 - 2 * q2 * q2 + 1) * 57.3f;
+             -2 * q1 * q1 - 2 * q2 * q2 + 1) * RAD_TO_DEG;
 
     const float yaw =
         atan2(2 * (q1 * q2 + q0 * q3),
-              q0*q0 + q1*q1 - q2*q2 - q3*q3) * 57.3f;
+              q0*q0 + q1*q1 - q2*q2 - q3*q3) * RAD_TO_DEG;
 
     q0_ = q0;
     q1_ = q1;
@@ -144,7 +156,7 @@ void Imu::run_self_test()
     long accel[3] {};
     const int result { mpu_run_self_test(gyro, accel) } ;
 
-    if (result == 0x7) {
+    if (result == ALL_SELF_TESTS_PASSED) {
         float sens {};
         unsigned short accel_sens {};
 

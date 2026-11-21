@@ -16,6 +16,10 @@ namespace
     // APB1 timer clock is 72 MHz: divide by 72 for 1 us ticks.
     constexpr std::uint16_t TIMER_PRESCALER {71};
     constexpr std::uint16_t TIMER_PERIOD {0xFFFF};
+
+    // Channel 2 captures the echo edges; channel 3 is the capture deadline.
+    constexpr std::uint16_t ECHO_INTERRUPTS {TIM_IT_CC2 | TIM_IT_CC3};
+    constexpr std::uint16_t ALL_TIMER_FLAGS {TIM_FLAG_Update | TIM_FLAG_CC2 | TIM_FLAG_CC3 | TIM_FLAG_CC2OF};
 }
 
 void Ultrasonic::init()
@@ -69,10 +73,9 @@ void Ultrasonic::init()
     TIM_OC3Init(TIM5, &deadline);
 
     TIM_CCxCmd(TIM5, TIM_Channel_2, TIM_CCx_Disable);
-    TIM_ITConfig(TIM5, TIM_IT_CC2 | TIM_IT_CC3, DISABLE);
+    TIM_ITConfig(TIM5, ECHO_INTERRUPTS, DISABLE);
     TIM_SetCounter(TIM5, 0);
-    TIM_ClearFlag(TIM5, TIM_FLAG_Update | TIM_FLAG_CC2 |
-                        TIM_FLAG_CC3 | TIM_FLAG_CC2OF);
+    TIM_ClearFlag(TIM5, ALL_TIMER_FLAGS);
     NVIC_ClearPendingIRQ(TIM5_IRQn);
 
     active_sensor = this;
@@ -89,12 +92,11 @@ void Ultrasonic::init()
 
 void Ultrasonic::finishCapture(EchoStatus status, std::uint32_t pulse_us)
 {
-    TIM_ITConfig(TIM5, TIM_IT_CC2 | TIM_IT_CC3, DISABLE);
+    TIM_ITConfig(TIM5, ECHO_INTERRUPTS, DISABLE);
     TIM_Cmd(TIM5, DISABLE);
     TIM_CCxCmd(TIM5, TIM_Channel_2, TIM_CCx_Disable);
 
-    TIM_ClearFlag(TIM5, TIM_FLAG_Update | TIM_FLAG_CC2 |
-                        TIM_FLAG_CC3 | TIM_FLAG_CC2OF);
+    TIM_ClearFlag(TIM5, ALL_TIMER_FLAGS);
     NVIC_ClearPendingIRQ(TIM5_IRQn);
 
     if (status == EchoStatus::captured)
@@ -124,13 +126,17 @@ bool Ultrasonic::start(std::uint32_t now_ms)
         return false;
     }
 
-    if (has_started_ && static_cast<std::uint32_t>(now_ms - last_started_ms_) < MIN_TRIGGER_INTERVAL_MS)
+    if (has_started_)
     {
-        return false;
+        const auto since_last_ms = static_cast<std::uint32_t>(now_ms - last_started_ms_);
+        if (since_last_ms < MIN_TRIGGER_INTERVAL_MS)
+        {
+            return false;
+        }
     }
 
     NVIC_DisableIRQ(TIM5_IRQn);
-    TIM_ITConfig(TIM5, TIM_IT_CC2 | TIM_IT_CC3, DISABLE);
+    TIM_ITConfig(TIM5, ECHO_INTERRUPTS, DISABLE);
     TIM_Cmd(TIM5, DISABLE);
     TIM_CCxCmd(TIM5, TIM_Channel_2, TIM_CCx_Disable);
     GPIO_ResetBits(GPIOA, GPIO_Pin_0);
@@ -139,8 +145,7 @@ bool Ultrasonic::start(std::uint32_t now_ms)
     TIM5->CCER = TIM5->CCER & ~TIM_CCER_CC2P;
     TIM_GenerateEvent(TIM5, TIM_EventSource_Update);
     TIM_SetCounter(TIM5, 0);
-    TIM_ClearFlag(TIM5, TIM_FLAG_Update | TIM_FLAG_CC2 |
-                        TIM_FLAG_CC3 | TIM_FLAG_CC2OF);
+    TIM_ClearFlag(TIM5, ALL_TIMER_FLAGS);
     NVIC_ClearPendingIRQ(TIM5_IRQn);
 
     rise_ticks_ = 0;
@@ -160,7 +165,7 @@ bool Ultrasonic::start(std::uint32_t now_ms)
 
     state_ = State::waiting_rise;
     TIM_CCxCmd(TIM5, TIM_Channel_2, TIM_CCx_Enable);
-    TIM_ITConfig(TIM5, TIM_IT_CC2 | TIM_IT_CC3, ENABLE);
+    TIM_ITConfig(TIM5, ECHO_INTERRUPTS, ENABLE);
     TIM_Cmd(TIM5, ENABLE);
     NVIC_EnableIRQ(TIM5_IRQn);
 
@@ -177,8 +182,7 @@ void Ultrasonic::handleInterrupt()
 
     if (state != State::waiting_rise && state != State::waiting_fall)
     {
-        TIM_ClearFlag(TIM5, TIM_FLAG_Update | TIM_FLAG_CC2 |
-                            TIM_FLAG_CC3 | TIM_FLAG_CC2OF);
+        TIM_ClearFlag(TIM5, ALL_TIMER_FLAGS);
         return;
     }
 
@@ -203,8 +207,9 @@ void Ultrasonic::handleInterrupt()
 
         if (ticks >= CAPTURE_TIMEOUT_US)
         {
-            finishCapture(state == State::waiting_rise
-                              ? EchoStatus::no_echo : EchoStatus::timeout, 0);
+            const EchoStatus missed = (state == State::waiting_rise) ? EchoStatus::no_echo
+                                                                      : EchoStatus::timeout;
+            finishCapture(missed, 0);
             return;
         }
 
@@ -252,8 +257,9 @@ void Ultrasonic::handleInterrupt()
             return;
         }
 
-        finishCapture(state_ == State::waiting_rise
-                          ? EchoStatus::no_echo : EchoStatus::timeout, 0);
+        const EchoStatus missed = (state_ == State::waiting_rise) ? EchoStatus::no_echo
+                                                                  : EchoStatus::timeout;
+        finishCapture(missed, 0);
     }
 }
 
@@ -269,17 +275,21 @@ bool Ultrasonic::poll(std::uint32_t now_ms, EchoCapture& result)
     const bool waiting = state_ == State::waiting_rise ||
                          state_ == State::waiting_fall;
 
-    // The extra millisecond avoids expiring early through clock quantisation.
-    if (waiting &&
-        static_cast<std::uint32_t>(now_ms - started_ms_) >
-            CAPTURE_TIMEOUT_US / 1000)
+    if (waiting)
     {
-        // Preserve a valid captured edge even if its IRQ was delayed.
-        handleInterrupt();
+        const auto elapsed_ms = static_cast<std::uint32_t>(now_ms - started_ms_);
+        const std::uint32_t timeout_ms = CAPTURE_TIMEOUT_US / 1000;
 
-        if (state_ == State::waiting_rise || state_ == State::waiting_fall)
+        // '>' not '>=': the extra millisecond avoids expiring early through clock quantisation.
+        if (elapsed_ms > timeout_ms)
         {
-            finishCapture(EchoStatus::capture_error, 0);
+            // Preserve a valid captured edge even if its IRQ was delayed.
+            handleInterrupt();
+
+            if (state_ == State::waiting_rise || state_ == State::waiting_fall)
+            {
+                finishCapture(EchoStatus::capture_error, 0);
+            }
         }
     }
 

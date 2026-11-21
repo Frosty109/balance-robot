@@ -16,6 +16,21 @@ static inline void motor_set_pwm(uint16_t l_a, uint16_t l_b, uint16_t r_a, uint1
     TIM8->CCR4 = r_b;
 }
 
+// Splits a signed command into the two H-bridge inputs; only one is ever driven.
+static void splitCommand(int pwm, uint16_t& when_positive, uint16_t& when_negative)
+{
+    when_positive = 0;
+    when_negative = 0;
+    if (pwm > 0)
+    {
+        when_positive = static_cast<uint16_t>(pwm);
+    }
+    if (pwm < 0)
+    {
+        when_negative = static_cast<uint16_t>(-pwm);
+    }
+}
+
 Motor::Motor() {}
 
 void Motor::init(uint16_t arr, uint16_t psc)
@@ -76,10 +91,13 @@ void Motor::setPWM(int pwm_left, int pwm_right)
         return;
     }
 
-    uint16_t l_a = pwm_left  < 0 ? abs(pwm_left)  : 0;
-    uint16_t l_b = pwm_left  > 0 ? abs(pwm_left)  : 0;
-    uint16_t r_a = pwm_right > 0 ? abs(pwm_right) : 0;
-    uint16_t r_b = pwm_right < 0 ? abs(pwm_right) : 0;
+    uint16_t l_a = 0;
+    uint16_t l_b = 0;
+    uint16_t r_a = 0;
+    uint16_t r_b = 0;
+    // The sides are mirrored: positive drives B on the left but A on the right.
+    splitCommand(pwm_left, l_b, l_a);
+    splitCommand(pwm_right, r_a, r_b);
 
     motor_set_pwm(l_a, l_b, r_a, r_b);
 }

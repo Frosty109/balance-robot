@@ -9,6 +9,10 @@ namespace balance_car::core
 namespace
 {
 
+// Visible ASCII; spaces, control bytes, DEL and non-ASCII bytes make a token malformed.
+constexpr unsigned char first_visible_byte {0x21};  // '!'
+constexpr unsigned char last_visible_byte {0x7e};   // '~'
+
 template <typename T>
 std::expected<T, ParseError> parse_number(std::string_view text)
 {
@@ -98,8 +102,11 @@ std::expected<StateEvent, ParseError> parse_state_event(std::string_view line)
     {
         const std::string_view token {part.begin(), part.end()};
         const auto eq = token.find('=');
-        if (eq == std::string_view::npos || eq == 0 || eq + 1 == token.size()
-            || token.find('=', eq + 1) != std::string_view::npos)
+        const bool no_equals = eq == std::string_view::npos;
+        const bool empty_key = eq == 0;
+        const bool empty_value = eq + 1 == token.size();
+        const bool second_equals = token.find('=', eq + 1) != std::string_view::npos;
+        if (no_equals || empty_key || empty_value || second_equals)
         {
             return std::unexpected(ParseError::malformed_field);
         }
@@ -108,7 +115,7 @@ std::expected<StateEvent, ParseError> parse_state_event(std::string_view line)
         for (const char ch : token)
         {
             const auto byte = static_cast<unsigned char>(ch);
-            if (byte < 0x21u || byte > 0x7eu)
+            if (byte < first_visible_byte || byte > last_visible_byte)
             {
                 return std::unexpected(ParseError::malformed_field);
             }

@@ -48,13 +48,14 @@ bool Stm32RangeSensor::poll()
             {
             case EchoStatus::captured:
             {
-                // Round-trip conversion at nominal 340 m/s, matching Yahboom.
-                const std::uint32_t scaled_mm = capture.pulse_us * 170u;
+                // Round trip at nominal 340 m/s is 170 um of range per us, matching Yahboom.
+                const std::uint32_t distance_um = capture.pulse_us * 170u;
+                const std::uint32_t min_um = MIN_DISTANCE_MM * 1000u;
+                const std::uint32_t max_um = MAX_DISTANCE_MM * 1000u;
 
-                if (scaled_mm >= MIN_DISTANCE_MM * 1000u &&
-                    scaled_mm <= MAX_DISTANCE_MM * 1000u)
+                if (distance_um >= min_um && distance_um <= max_um)
                 {
-                    sample.distance_mm = scaled_mm / 1000u;
+                    sample.distance_mm = distance_um / 1000u;
                     sample.status = RangeStatus::valid;
                 }
                 else
