@@ -124,7 +124,7 @@ Either way, only flash with the car disarmed or off.
 | `devlog/` | public-facing notes and drafts; read `devlog/README.md` first | no |
 | `reviews/` | review findings and adjudications | yes |
 | `radxa/` | Q6A setup notes and the drive/flash workflow for the car | no |
-| `tools/` | host tools: `drive.ps1`, `drive.py`, `flash.sh`, `switch-check.sh`, `sync-vault.sh` | no |
+| `tools/` | host tools: `drive.py`, `flash.sh`, `switch-check.sh`, `sync-vault.sh`; retired Windows tools in `tools/retired/` | no |
 | `Yahboom-Self-Balancing-Car/` | reference source; verify values here, not from memory | no |
 
 The local-only records are synced by MEGA and backed up with FreeFileSync to a second drive and to
