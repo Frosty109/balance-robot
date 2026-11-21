@@ -5,6 +5,7 @@ add_library(balance_car_core
     src/telemetry.cpp
     src/state_events.cpp
     src/health_telemetry.cpp
+    src/protocol.cpp
 )
 add_library(balance_car_core::balance_car_core ALIAS balance_car_core)
 
@@ -28,6 +29,7 @@ if(BALANCE_CAR_CORE_BUILD_TESTS)
         test/test_line_buffer.cpp
         test/test_state_events.cpp
         test/test_health_telemetry.cpp
+        test/test_protocol.cpp
     )
     target_link_libraries(balance_car_core_tests PRIVATE
         balance_car_core::balance_car_core
