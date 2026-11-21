@@ -87,7 +87,7 @@ int main()
     AppControl app(sensor_hal,
                    motor_hal,
                    clock,
-                   BalancePD(12240.0f, 94.0f, 0.0f),
+                   BalancePD(12240.0f, 94.0f, 3.5f),
                    VelocityPI(7000.0f, 35.0f, velocity_integral_limit),
                    YawRateP(1.0f, 30.0f, 100, 1.0f));
 
