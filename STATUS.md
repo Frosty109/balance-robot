@@ -16,9 +16,14 @@ tracking remain. Stage 10 is still open. Battery cutoff remains off.
 **First auto-stop runs (2026-11-21), `--stop-mm 400`, 50 mm/s:** `AUTO STOP reason=obstacle` at
 393 and 395 mm, within 1 ms of the reading; coast ~32 mm by sonar, wheels at rest by ~0.9 s; no
 non-valid readings during either run. Then, unexpectedly, the car rolled back ~80–90 mm (by encoder)
-starting 1–2 s after the stop, away from the obstacle here. Cause inferred, not proven: velocity
-integral unwinding plus the camera's standing integral. Unmeasured for a stop while reversing.
+starting 1–2 s after the stop, away from the obstacle here. Telemetry showed the velocity integral
+holding the camera's lean (~1400 of 2000 standing), bleeding in the coast, then pinning at 2000.
 Evidence: `sessions/artefacts/2026-11-21/2026-11-21-auto-01.txt` (third session in the file).
+**`mid_angle` 4.0 (image `6aa3ab09…`), one hold and one run:** standing `i` −61 (was ~1377), never
+saturated; stop at 398 mm; no one-way rollback (5 s after the stop: 178 mm forward, 180 mm back).
+The car instead rocks about ±130 mm/s at ~0.5 Hz after the stop (range 353–447 mm, closest 353),
+the known cycling, not cured by stopping. Hold pitch averaged 3.53°, so source now has 3.5 (untested).
+Evidence: `2026-11-21-midangle4-hold.txt`, `2026-11-21-midangle4-auto.txt`.
 A camera unplug/replug left `/dev/ttyUSB0` and the link untouched (one trial;
 `2026-11-21-camera-replug.txt`), so the camera is not blocking driving.
 **2026-11-21: readability refactor `3ec0d3b` flashed and accepted for development.** No intended
@@ -392,8 +397,9 @@ link, `mid_angle=0`, `DEADZONE=1300`. User reported build/flash; supplied progra
 verifies a 49,280-byte binary followed by running turn telemetry. `i` reaches 1000 and `tr`
 is consistent with ff=1. On 2026-10-26 a boot banner directly confirmed limit 1000, but not every
 gain. Current source instead sets limit 2000, as qualified above; the boot print shares that
-constant with the constructor. Current source retains the control settings introduced in
-`053de0d`: balance `(12240,94,0)`, velocity `(7000,35,2000)`, yaw `(1,30,100,1)`.
+constant with the constructor. Current source (`9d50c94`) sets balance `(12240,94,3.5)`: `mid_angle` 3.5° for the
+camera-loaded car, not yet built or flashed. The running image has `mid_angle` 4.0 (below). The
+other settings remain those of `053de0d`: velocity `(7000,35,2000)`, yaw `(1,30,100,1)`.
 Range telemetry (also enabled while armed in source) and the fresh-interval diagnostic are
 committed as `df5827b`; additional yaw tests as `2d5acd8`. Historical Stage 11 remains closed
 at the earlier `3a8e648` configuration, not the larger current limit. Battery cutoff off;
@@ -401,10 +407,11 @@ at the earlier `3a8e648` configuration, not the larger current limit. Battery cu
 ±100 mm/s, ±30 deg/s, 200 mm/s², 60 deg/s², 250 ms. Latest full Windows host build/CTest
 **148/148 passed (2026-11-07)**; latest saved Docker suite remains 96/96 (2026-10-30).
 Ubuntu host build/CTest **148/148** before and after the 2026-11-21 refactor.
-Running image: `3ec0d3b`, built on Ubuntu in `build-fw-linux/` (GCC 15.2.1, -O0), ELF text/data/bss
-52540/140/2548, `firmware.bin` 52,680 bytes, SHA-256 `b5acd82764d6062791f1b87b6c73daaa…`, flashed
-2026-11-21 through the Q6A. It replaced `99f0050` (`16747de9…`, flashed 2026-11-19), which is kept on
-the Q6A. Gains and governor as above; `stm32/USER/main.cpp` was not changed by the refactor.
+Running image: `3ec0d3b` plus `mid_angle` 4.0 in an uncommitted `main.cpp`, built on Ubuntu in
+`build-fw-linux/` (GCC 15.2.1, -O0), `firmware.bin` 52,680 bytes, SHA-256 `6aa3ab09bc24ed94…`, flashed
+2026-11-21 through the Q6A. It is the only source state never committed: `9d50c94` has 3.5. The Q6A
+keeps the earlier images `firmware-b5acd827.bin` (`3ec0d3b`, mid_angle 0, refactor accepted) and
+`firmware-16747de9.bin` (`99f0050`).
 
 ## Closed milestones
 
